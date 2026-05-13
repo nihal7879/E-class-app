@@ -1,15 +1,24 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
-import { getCatalogue } from "@/lib/aggregations";
+import { availableFilterOptions } from "@/lib/aggregations";
 import { useFilter } from "@/lib/filterContext";
-import { MONTH_LABELS, formatCourseLabel, shortSchoolName } from "@/lib/parse";
+import {
+  MONTH_LABELS,
+  formatCourseLabel,
+  schoolId,
+  shortSchoolName,
+} from "@/lib/parse";
 import MultiSelect from "./MultiSelect";
 import SingleSelect from "./SingleSelect";
 
 export default function FilterButton() {
   const { filter, setFilter, reset, hasActive } = useFilter();
-  const cat = useMemo(() => getCatalogue(), []);
+  const loc = useLocation();
+  const nav = useNavigate();
+  const onDetail = loc.pathname.startsWith("/school/");
+  const available = useMemo(() => availableFilterOptions(filter), [filter]);
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -18,7 +27,9 @@ export default function FilterButton() {
   const activeCount =
     (filter.month !== "all" ? 1 : 0) +
     filter.schools.length +
-    filter.courses.length;
+    filter.courses.length +
+    filter.divisions.length +
+    filter.genders.length;
 
   useLayoutEffect(() => {
     if (!open || !buttonRef.current) return;
@@ -44,7 +55,6 @@ export default function FilterButton() {
       const t = e.target as Node;
       if (buttonRef.current?.contains(t)) return;
       if (panelRef.current?.contains(t)) return;
-      // If the click is inside a portalled MultiSelect panel (z-index 1000), keep open.
       const portalled = (t as HTMLElement).closest?.('[data-portal="multiselect"]');
       if (portalled) return;
       setOpen(false);
@@ -62,13 +72,25 @@ export default function FilterButton() {
 
   const yearOptions = [
     { value: "all" as const, label: "All years" },
-    ...cat.years.map((y) => ({ value: y, label: String(y) })),
+    ...available.years.map((y) => ({ value: y, label: String(y) })),
   ];
 
   const monthOptions = [
     { value: "all" as const, label: "All months" },
-    ...cat.months.map((m) => ({ value: m, label: MONTH_LABELS[m - 1] })),
+    ...available.months.map((m) => ({ value: m, label: MONTH_LABELS[m - 1] })),
   ];
+
+  const handleSchoolChange = (next: string[]) => {
+    setFilter((f) => ({ ...f, schools: next }));
+    if (onDetail) {
+      if (next.length === 1) {
+        nav(`/school/${schoolId(next[0])}`);
+      } else if (next.length === 0) {
+        nav("/dashboard");
+      }
+      // multi-select on detail: leave URL, filter still applies elsewhere
+    }
+  };
 
   return (
     <>
@@ -118,7 +140,7 @@ export default function FilterButton() {
                     Filters
                   </div>
                   <div className="text-[11px] text-slate-500">
-                    Narrow down what you see on the dashboard
+                    Showing only options that exist in your data
                   </div>
                 </div>
               </div>
@@ -133,64 +155,77 @@ export default function FilterButton() {
             </div>
 
             <div className="grid grid-cols-2 gap-3 px-4 py-4">
-              <SingleSelect
-                label="Year"
-                options={yearOptions}
-                value={filter.year}
-                onChange={(v) => setFilter((f) => ({ ...f, year: v }))}
-              />
-              <SingleSelect
-                label="Month"
-                options={monthOptions}
-                value={filter.month}
-                onChange={(v) => setFilter((f) => ({ ...f, month: v }))}
-              />
-              <div className="col-span-2">
-                <MultiSelect
-                  label="School"
-                  options={cat.schools}
-                  value={filter.schools}
-                  onChange={(next) =>
-                    setFilter((f) => ({ ...f, schools: next }))
-                  }
-                  placeholder="All schools"
-                  formatOption={(o) => shortSchoolName(o, 36)}
+              {available.years.length > 0 && (
+                <SingleSelect
+                  label="Year"
+                  options={yearOptions}
+                  value={filter.year}
+                  onChange={(v) => setFilter((f) => ({ ...f, year: v }))}
                 />
-              </div>
-              <div className="col-span-2">
-                <MultiSelect
-                  label="Course"
-                  options={cat.courses}
-                  value={filter.courses}
-                  onChange={(next) =>
-                    setFilter((f) => ({ ...f, courses: next }))
-                  }
-                  placeholder={
-                    cat.courses.length === 0
-                      ? "No courses in data"
-                      : "All courses"
-                  }
-                  formatOption={formatCourseLabel}
+              )}
+              {available.months.length > 0 && (
+                <SingleSelect
+                  label="Month"
+                  options={monthOptions}
+                  value={filter.month}
+                  onChange={(v) => setFilter((f) => ({ ...f, month: v }))}
                 />
-              </div>
-              <div className="col-span-2">
-                <label className="mb-1 block text-xs font-medium text-slate-600">
-                  Device type
-                </label>
-                <div className="flex h-[38px] items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-400">
-                  <span>All devices</span>
-                  <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-[10px] font-medium text-slate-600">
-                    Soon
-                  </span>
+              )}
+              {available.schools.length > 0 && (
+                <div className="col-span-2">
+                  <MultiSelect
+                    label="School"
+                    options={available.schools}
+                    value={filter.schools}
+                    onChange={handleSchoolChange}
+                    placeholder="All schools"
+                    formatOption={(o) => shortSchoolName(o, 36)}
+                  />
                 </div>
-              </div>
+              )}
+              {available.courses.length > 0 && (
+                <div className="col-span-2">
+                  <MultiSelect
+                    label="Course"
+                    options={available.courses}
+                    value={filter.courses}
+                    onChange={(next) =>
+                      setFilter((f) => ({ ...f, courses: next }))
+                    }
+                    placeholder="All courses"
+                    formatOption={formatCourseLabel}
+                  />
+                </div>
+              )}
+              {available.divisions.length > 0 && (
+                <MultiSelect
+                  label="Division"
+                  options={available.divisions}
+                  value={filter.divisions}
+                  onChange={(next) =>
+                    setFilter((f) => ({ ...f, divisions: next }))
+                  }
+                  placeholder="All divisions"
+                />
+              )}
+              {available.genders.length > 0 && (
+                <MultiSelect
+                  label="Gender"
+                  options={available.genders}
+                  value={filter.genders}
+                  onChange={(next) =>
+                    setFilter((f) => ({ ...f, genders: next }))
+                  }
+                  placeholder="All"
+                />
+              )}
             </div>
 
             <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/60 px-4 py-2.5">
               <button
                 type="button"
                 onClick={reset}
-                disabled={!hasActive && filter.year === (cat.years[0] ?? "all")}
+                disabled={!hasActive && filter.year === (available.years[0] ?? "all")}
                 className="text-xs font-medium text-slate-500 transition hover:text-accent-600 disabled:cursor-not-allowed disabled:text-slate-300"
               >
                 Reset all

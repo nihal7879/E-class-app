@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import {
   computeSchoolDailyActivity,
@@ -16,7 +16,18 @@ import SectionHeader from "@/components/ui/SectionHeader";
 export default function SchoolDetailPage() {
   const { schoolId: id } = useParams<{ schoolId: string }>();
   const school = id ? schoolFromId(id) : "";
-  const { filter } = useFilter();
+  const { filter, setFilter } = useFilter();
+
+  // Keep the schools filter in sync with the URL school so the Filter popover
+  // reflects the current view, and so changes to it can navigate elsewhere.
+  useEffect(() => {
+    if (!school) return;
+    setFilter((f) =>
+      f.schools.length === 1 && f.schools[0] === school
+        ? f
+        : { ...f, schools: [school] },
+    );
+  }, [school, setFilter]);
 
   const students = useMemo(() => computeStudentStats(school, filter), [school, filter]);
   const daily = useMemo(

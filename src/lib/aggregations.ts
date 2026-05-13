@@ -29,7 +29,6 @@ function matchesSchool(school: string, schools: string[]) {
 }
 
 export function filterLogins(rows: LoginRow[], f: FilterState): LoginRow[] {
-  // Courses filter must be applied via Video-Usage join, since LoginHistory has no Course.
   const courseUserIds =
     f.courses.length === 0 ? null : courseUserIdSet(VIDEO_ROWS, f.courses);
 
@@ -38,6 +37,8 @@ export function filterLogins(rows: LoginRow[], f: FilterState): LoginRow[] {
       matchesYear(r.LoginDate, f.year) &&
       matchesMonth(r.LoginDate, f.month) &&
       matchesSchool(r.School, f.schools) &&
+      (f.divisions.length === 0 || f.divisions.includes(r.Division)) &&
+      (f.genders.length === 0 || f.genders.includes(r.Gender)) &&
       (courseUserIds === null || courseUserIds.has(r.UserID)),
   );
 }
@@ -48,7 +49,9 @@ export function filterVideos(rows: VideoRow[], f: FilterState): VideoRow[] {
       matchesYear(r.LastAccessDate, f.year) &&
       matchesMonth(r.LastAccessDate, f.month) &&
       matchesSchool(r.School, f.schools) &&
-      (f.courses.length === 0 || f.courses.includes(r.Course)),
+      (f.courses.length === 0 || f.courses.includes(r.Course)) &&
+      (f.divisions.length === 0 || f.divisions.includes(r.Division)) &&
+      (f.genders.length === 0 || f.genders.includes(r.Gender)),
   );
 }
 
@@ -60,13 +63,15 @@ function courseUserIdSet(rows: VideoRow[], courses: string[]): Set<number> {
   return set;
 }
 
-// ---------- catalogue (for filter dropdowns) ----------
+// ---------- catalogue (full list of all values in source data) ----------
 
 export interface Catalogue {
   years: number[];
-  months: number[]; // 1..12 present in either dataset
+  months: number[];
   schools: string[];
   courses: string[];
+  divisions: string[];
+  genders: string[];
 }
 
 let _catalogue: Catalogue | null = null;
@@ -76,24 +81,105 @@ export function getCatalogue(): Catalogue {
   const months = new Set<number>();
   const schools = new Set<string>();
   const courses = new Set<string>();
+  const divisions = new Set<string>();
+  const genders = new Set<string>();
   for (const r of LOGIN_ROWS) {
     years.add(getYear(r.LoginDate));
     months.add(getMonth(r.LoginDate));
     schools.add(r.School);
+    if (r.Division) divisions.add(r.Division);
+    if (r.Gender) genders.add(r.Gender);
   }
   for (const r of VIDEO_ROWS) {
     years.add(getYear(r.LastAccessDate));
     months.add(getMonth(r.LastAccessDate));
     schools.add(r.School);
     if (r.Course) courses.add(r.Course);
+    if (r.Division) divisions.add(r.Division);
+    if (r.Gender) genders.add(r.Gender);
   }
   _catalogue = {
     years: Array.from(years).sort((a, b) => b - a),
     months: Array.from(months).sort((a, b) => a - b),
     schools: sortAlpha(Array.from(schools)),
     courses: sortCourses(Array.from(courses)),
+    divisions: sortAlpha(Array.from(divisions)),
+    genders: sortAlpha(Array.from(genders)),
   };
   return _catalogue;
+}
+
+// ---------- cascading: options available given current filter selections ----------
+
+type FilterField = keyof FilterState;
+
+function withoutField(f: FilterState, field: FilterField): FilterState {
+  const cleared = { ...f };
+  if (field === "year") cleared.year = "all";
+  else if (field === "month") cleared.month = "all";
+  else if (field === "schools") cleared.schools = [];
+  else if (field === "courses") cleared.courses = [];
+  else if (field === "divisions") cleared.divisions = [];
+  else if (field === "genders") cleared.genders = [];
+  return cleared;
+}
+
+export function availableFilterOptions(f: FilterState): Catalogue {
+  // Years
+  const yLF = filterLogins(LOGIN_ROWS, withoutField(f, "year"));
+  const yVF = filterVideos(VIDEO_ROWS, withoutField(f, "year"));
+  const years = new Set<number>();
+  for (const r of yLF) years.add(getYear(r.LoginDate));
+  for (const r of yVF) years.add(getYear(r.LastAccessDate));
+
+  // Months
+  const mLF = filterLogins(LOGIN_ROWS, withoutField(f, "month"));
+  const mVF = filterVideos(VIDEO_ROWS, withoutField(f, "month"));
+  const months = new Set<number>();
+  for (const r of mLF) months.add(getMonth(r.LoginDate));
+  for (const r of mVF) months.add(getMonth(r.LastAccessDate));
+
+  // Schools
+  const sLF = filterLogins(LOGIN_ROWS, withoutField(f, "schools"));
+  const sVF = filterVideos(VIDEO_ROWS, withoutField(f, "schools"));
+  const schools = new Set<string>();
+  for (const r of sLF) schools.add(r.School);
+  for (const r of sVF) schools.add(r.School);
+
+  // Courses (only in video data)
+  const cVF = filterVideos(VIDEO_ROWS, withoutField(f, "courses"));
+  const courses = new Set<string>();
+  for (const r of cVF) if (r.Course) courses.add(r.Course);
+
+  // Divisions
+  const dLF = filterLogins(LOGIN_ROWS, withoutField(f, "divisions"));
+  const dVF = filterVideos(VIDEO_ROWS, withoutField(f, "divisions"));
+  const divisions = new Set<string>();
+  for (const r of dLF) if (r.Division) divisions.add(r.Division);
+  for (const r of dVF) if (r.Division) divisions.add(r.Division);
+
+  // Genders
+  const gLF = filterLogins(LOGIN_ROWS, withoutField(f, "genders"));
+  const gVF = filterVideos(VIDEO_ROWS, withoutField(f, "genders"));
+  const genders = new Set<string>();
+  for (const r of gLF) if (r.Gender) genders.add(r.Gender);
+  for (const r of gVF) if (r.Gender) genders.add(r.Gender);
+
+  // Always include the user's currently-selected values, so they can be deselected
+  // even after they become "unavailable" under the rest of the filter.
+  for (const s of f.schools) schools.add(s);
+  for (const c of f.courses) courses.add(c);
+  for (const d of f.divisions) divisions.add(d);
+  for (const g of f.genders) genders.add(g);
+
+  return {
+    years: Array.from(years).sort((a, b) => b - a),
+    months: Array.from(months).sort((a, b) => a - b),
+    schools: sortAlpha(Array.from(schools)),
+    courses: sortCourses(Array.from(courses)),
+    divisions: sortAlpha(Array.from(divisions)),
+    genders: sortAlpha(Array.from(genders)),
+  };
 }
 
 // ---------- KPIs ----------

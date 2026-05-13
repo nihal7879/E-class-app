@@ -24,6 +24,8 @@ const initialFilter = (): FilterState => {
     month: "all",
     schools: [],
     courses: [],
+    divisions: [],
+    genders: [],
   };
 };
 
@@ -39,7 +41,9 @@ export function FilterProvider({ children }: { children: ReactNode }) {
       hasActive:
         filter.month !== "all" ||
         filter.schools.length > 0 ||
-        filter.courses.length > 0,
+        filter.courses.length > 0 ||
+        filter.divisions.length > 0 ||
+        filter.genders.length > 0,
     }),
     [filter],
   );

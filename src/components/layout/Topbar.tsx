@@ -53,8 +53,6 @@ export default function Topbar() {
         >
           <SearchIcon />
           <span>Search schools…</span>
-          <span className="kbd ml-1">⌘</span>
-          <span className="kbd">K</span>
         </button>
 
         <FilterButton />
