@@ -60,7 +60,8 @@ export default function SchoolTrendChart({ onSchoolClick }: Props) {
     return m;
   }, [topSchools]);
 
-  const formatDate = (d: string) => d.slice(5);
+  const formatDate = (d: string) => d.slice(8); // "YYYY-MM-DD" -> "DD"
+  const formatDateFull = (d: string) => d; // tooltip keeps the full date
 
   const subtitle =
     schools.length > 0
@@ -134,7 +135,7 @@ export default function SchoolTrendChart({ onSchoolClick }: Props) {
                 <Tooltip
                   content={
                     <CustomTooltip
-                      labelFormatter={(d) => d}
+                      labelFormatter={formatDateFull}
                       formatter={(v) => `${v} logins`}
                     />
                   }

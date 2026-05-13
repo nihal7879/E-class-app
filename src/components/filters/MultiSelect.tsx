@@ -139,6 +139,7 @@ export default function MultiSelect({
         createPortal(
           <div
             ref={panelRef}
+            data-portal="multiselect"
             style={{
               position: "fixed",
               top: pos.top,

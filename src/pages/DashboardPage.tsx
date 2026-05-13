@@ -1,5 +1,4 @@
 import { useNavigate } from "react-router-dom";
-import FilterBar from "@/components/filters/FilterBar";
 import KpiStrip from "@/components/kpi/KpiStrip";
 import SchoolTrendChart from "@/components/charts/SchoolTrendChart";
 import SchoolSessionBar from "@/components/charts/SchoolSessionBar";
@@ -13,8 +12,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 pb-12">
-      <FilterBar />
-
       <KpiStrip />
 
       <div>

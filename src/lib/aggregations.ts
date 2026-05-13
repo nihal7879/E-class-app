@@ -4,6 +4,7 @@ import {
   getMonth,
   getYear,
   sortAlpha,
+  sortCourses,
   uniq,
 } from "./parse";
 import type {
@@ -90,7 +91,7 @@ export function getCatalogue(): Catalogue {
     years: Array.from(years).sort((a, b) => b - a),
     months: Array.from(months).sort((a, b) => a - b),
     schools: sortAlpha(Array.from(schools)),
-    courses: sortAlpha(Array.from(courses)),
+    courses: sortCourses(Array.from(courses)),
   };
   return _catalogue;
 }

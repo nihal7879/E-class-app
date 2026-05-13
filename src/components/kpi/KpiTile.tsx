@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import clsx from "clsx";
-import Sparkline from "./Sparkline";
 
 interface KpiTileProps {
   label: string;
@@ -8,43 +7,18 @@ interface KpiTileProps {
   unit?: string;
   hint?: ReactNode;
   icon: ReactNode;
-  series?: { date: string; value: number }[];
   tone?: ToneKey;
 }
 
 type ToneKey = "indigo" | "violet" | "emerald" | "amber" | "rose" | "slate";
 
-const TONES: Record<ToneKey, { stroke: string; iconBg: string; iconFg: string }> = {
-  indigo: {
-    stroke: "#4f46e5",
-    iconBg: "bg-indigo-100",
-    iconFg: "text-indigo-600",
-  },
-  violet: {
-    stroke: "#7c3aed",
-    iconBg: "bg-violet-100",
-    iconFg: "text-violet-600",
-  },
-  emerald: {
-    stroke: "#059669",
-    iconBg: "bg-emerald-100",
-    iconFg: "text-emerald-600",
-  },
-  amber: {
-    stroke: "#d97706",
-    iconBg: "bg-amber-100",
-    iconFg: "text-amber-600",
-  },
-  rose: {
-    stroke: "#e11d48",
-    iconBg: "bg-rose-100",
-    iconFg: "text-rose-600",
-  },
-  slate: {
-    stroke: "#475569",
-    iconBg: "bg-slate-100",
-    iconFg: "text-slate-600",
-  },
+const TONES: Record<ToneKey, { iconBg: string; iconFg: string }> = {
+  indigo: { iconBg: "bg-indigo-100", iconFg: "text-indigo-600" },
+  violet: { iconBg: "bg-violet-100", iconFg: "text-violet-600" },
+  emerald: { iconBg: "bg-emerald-100", iconFg: "text-emerald-600" },
+  amber: { iconBg: "bg-amber-100", iconFg: "text-amber-600" },
+  rose: { iconBg: "bg-rose-100", iconFg: "text-rose-600" },
+  slate: { iconBg: "bg-slate-100", iconFg: "text-slate-600" },
 };
 
 export default function KpiTile({
@@ -53,12 +27,11 @@ export default function KpiTile({
   unit,
   hint,
   icon,
-  series,
   tone = "indigo",
 }: KpiTileProps) {
   const t = TONES[tone];
   return (
-    <div className="card card-hover group relative flex flex-col overflow-hidden p-5">
+    <div className="card card-hover group relative flex flex-col p-5">
       <div className="flex items-start justify-between gap-3">
         <div
           className={clsx(
@@ -83,18 +56,7 @@ export default function KpiTile({
         )}
       </div>
 
-      {hint && (
-        <div className="mt-1.5 text-[12px] text-slate-500">{hint}</div>
-      )}
-
-      <div className="mt-3 -mx-1 -mb-1 opacity-90 transition group-hover:opacity-100">
-        <Sparkline
-          data={series ?? []}
-          color={t.stroke}
-          gradientId={`spark-${label.replace(/\s+/g, "-").toLowerCase()}`}
-          height={38}
-        />
-      </div>
+      {hint && <div className="mt-1.5 text-[12px] text-slate-500">{hint}</div>}
     </div>
   );
 }

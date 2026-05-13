@@ -2,12 +2,10 @@ import { useMemo } from "react";
 import { useParams } from "react-router-dom";
 import {
   computeSchoolDailyActivity,
-  computeSchoolDailyUsageHours,
   computeStudentStats,
 } from "@/lib/aggregations";
 import { useFilter } from "@/lib/filterContext";
 import { formatNumber, schoolFromId } from "@/lib/parse";
-import FilterBar from "@/components/filters/FilterBar";
 import KpiTile from "@/components/kpi/KpiTile";
 import DailyActivityChart from "@/components/charts/DailyActivityChart";
 import StudentSessionChart from "@/components/charts/StudentSessionChart";
@@ -25,10 +23,6 @@ export default function SchoolDetailPage() {
     () => computeSchoolDailyActivity(school, filter),
     [school, filter],
   );
-  const dailyHours = useMemo(
-    () => computeSchoolDailyUsageHours(school, filter),
-    [school, filter],
-  );
 
   const topStudents = students.slice(0, 5);
   const lowStudents = students
@@ -39,10 +33,6 @@ export default function SchoolDetailPage() {
   const totalSessions = students.reduce((a, s) => a + s.sessions, 0);
   const totalLogins = students.reduce((a, s) => a + s.logins, 0);
   const totalMs = students.reduce((a, s) => a + s.totalSessionMs, 0);
-
-  const dailyLogins = daily.map((d) => ({ date: d.date, value: d.logins }));
-  const dailyStudents = daily.map((d) => ({ date: d.date, value: d.uniqueStudents }));
-
   const totalHours = totalMs / 3_600_000;
 
   return (
@@ -64,29 +54,24 @@ export default function SchoolDetailPage() {
         </div>
       </div>
 
-      <FilterBar />
-
       <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <KpiTile
           tone="indigo"
           label="Students"
           value={formatNumber(students.length)}
           icon={<UsersIcon />}
-          series={dailyStudents}
         />
         <KpiTile
           tone="rose"
           label="Total logins"
           value={formatNumber(totalLogins)}
           icon={<KeyIcon />}
-          series={dailyLogins}
         />
         <KpiTile
           tone="violet"
           label="Total sessions"
           value={formatNumber(totalSessions)}
           icon={<PlayIcon />}
-          series={dailyLogins}
         />
         <KpiTile
           tone="amber"
@@ -94,7 +79,6 @@ export default function SchoolDetailPage() {
           value={totalHours >= 10 ? totalHours.toFixed(0) : totalHours.toFixed(1)}
           unit="hrs"
           icon={<ClockIcon />}
-          series={dailyHours}
         />
       </section>
 

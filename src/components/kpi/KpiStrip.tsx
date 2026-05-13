@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { computeDailyKpiSeries, computeKpis } from "@/lib/aggregations";
+import { computeKpis } from "@/lib/aggregations";
 import { useFilter } from "@/lib/filterContext";
 import { formatHours, formatNumber } from "@/lib/parse";
 import KpiTile from "./KpiTile";
@@ -7,7 +7,6 @@ import KpiTile from "./KpiTile";
 export default function KpiStrip() {
   const { filter } = useFilter();
   const k = useMemo(() => computeKpis(filter), [filter]);
-  const s = useMemo(() => computeDailyKpiSeries(filter), [filter]);
 
   const hours = k.totalLearningMs / 3_600_000;
 
@@ -19,7 +18,6 @@ export default function KpiStrip() {
         value={formatNumber(k.totalSchools)}
         hint="Active in selection"
         icon={<SchoolIcon />}
-        series={s.schools}
       />
       <KpiTile
         tone="violet"
@@ -27,7 +25,6 @@ export default function KpiStrip() {
         value={formatNumber(k.totalStudents)}
         hint="Unique learners"
         icon={<UsersIcon />}
-        series={s.students}
       />
       <KpiTile
         tone="emerald"
@@ -35,7 +32,6 @@ export default function KpiStrip() {
         value={formatNumber(k.totalCourses)}
         hint="From video activity"
         icon={<BookIcon />}
-        series={s.courses}
       />
       <KpiTile
         tone="amber"
@@ -44,7 +40,6 @@ export default function KpiStrip() {
         unit="hrs"
         hint={`${formatHours(k.totalLearningMs)} watched`}
         icon={<ClockIcon />}
-        series={s.hours}
       />
       <KpiTile
         tone="rose"
@@ -52,7 +47,6 @@ export default function KpiStrip() {
         value={formatNumber(k.totalLogins)}
         hint="In selected period"
         icon={<KeyIcon />}
-        series={s.logins}
       />
     </section>
   );

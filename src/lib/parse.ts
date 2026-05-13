@@ -66,3 +66,38 @@ export function uniq<T>(arr: T[]): T[] {
 export function sortAlpha(arr: string[]): string[] {
   return [...arr].sort((a, b) => a.localeCompare(b));
 }
+
+// Order: 1st, 2nd, 3rd, ... 10th, then anything without an ordinal alphabetically.
+export function sortCourses(arr: string[]): string[] {
+  const ord = (s: string): number => {
+    // No \b after the suffix — "_" counts as a word char in regex, so \b would never match
+    // "10TH_SEMI-ENGLISH_MARATHI". Just anchor at the start.
+    const m = s.match(/^(\d+)(ST|ND|RD|TH)/i);
+    return m ? parseInt(m[1], 10) : Number.POSITIVE_INFINITY;
+  };
+  return [...arr].sort((a, b) => {
+    const an = ord(a);
+    const bn = ord(b);
+    if (an !== bn) return an - bn;
+    return a.localeCompare(b);
+  });
+}
+
+// "1ST_SEMI-ENGLISH_MARATHI" -> "1st Semi-English Marathi"
+export function formatCourseLabel(raw: string): string {
+  return raw
+    .split("_")
+    .map((part) => {
+      const ord = part.match(/^(\d+)(ST|ND|RD|TH)$/i);
+      if (ord) return ord[1] + ord[2].toLowerCase();
+      return part
+        .split("-")
+        .map((w) =>
+          w.length === 0
+            ? w
+            : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(),
+        )
+        .join("-");
+    })
+    .join(" ");
+}

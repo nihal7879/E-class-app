@@ -47,7 +47,7 @@ export default function DailyActivityChart({ data }: Props) {
               />
               <XAxis
                 dataKey="date"
-                tickFormatter={(d) => d.slice(5)}
+                tickFormatter={(d) => d.slice(8)}
                 tick={AXIS_TICK_STYLE}
                 stroke={AXIS_COLOR}
                 tickLine={false}
