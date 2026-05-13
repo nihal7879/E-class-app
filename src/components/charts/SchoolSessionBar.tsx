@@ -12,6 +12,7 @@ import {
 import { computeSchoolStats } from "@/lib/aggregations";
 import { useFilter } from "@/lib/filterContext";
 import { formatHours, formatNumber, shortSchoolName } from "@/lib/parse";
+import { useIsSm } from "@/lib/useMediaQuery";
 import ChartCard from "./ChartCard";
 import { CustomTooltip } from "./Tooltip";
 import {
@@ -37,15 +38,21 @@ interface Props {
 
 export default function SchoolSessionBar({ onSchoolClick }: Props) {
   const { filter } = useFilter();
+  const isSm = useIsSm();
   const stats = useMemo(() => computeSchoolStats(filter), [filter]);
   const [metric, setMetric] = useState<Metric>("logins");
+
+  const labelMax = isSm ? 22 : 14;
+  const yAxisWidth = isSm ? 180 : 110;
+  const rowHeight = isSm ? 24 : 20;
+  const baseHeight = isSm ? 360 : 280;
 
   const data = useMemo(
     () =>
       stats
         .map((s) => ({
           school: s.school,
-          shortSchool: shortSchoolName(s.school, 22),
+          shortSchool: shortSchoolName(s.school, labelMax),
           logins: s.logins,
           sessions: s.sessions,
           hours: s.totalSessionMs / 3_600_000,
@@ -53,13 +60,13 @@ export default function SchoolSessionBar({ onSchoolClick }: Props) {
           uniqueStudents: s.uniqueStudents,
         }))
         .sort((a, b) => Number(b[metric]) - Number(a[metric])),
-    [stats, metric],
+    [stats, metric, labelMax],
   );
 
   return (
     <ChartCard
       title="How each school is doing"
-      subtitle="Click a school to see its students"
+      subtitle="Tap a bar to see the school's students"
       right={
         <div className="flex items-center gap-1 rounded-full bg-slate-100 p-1 text-xs">
           {METRIC_OPTIONS.map((m) => (
@@ -80,16 +87,16 @@ export default function SchoolSessionBar({ onSchoolClick }: Props) {
       }
     >
       {data.length === 0 ? (
-        <div className="flex h-[360px] items-center justify-center text-sm text-slate-400">
+        <div className="flex h-[280px] items-center justify-center text-sm text-slate-400 sm:h-[360px]">
           No data for this filter
         </div>
       ) : (
-        <div style={{ height: Math.max(360, data.length * 24 + 40) }}>
+        <div style={{ height: Math.max(baseHeight, data.length * rowHeight + 40) }}>
           <ResponsiveContainer>
             <BarChart
               data={data}
               layout="vertical"
-              margin={{ top: 4, right: 32, bottom: 4, left: 8 }}
+              margin={{ top: 4, right: isSm ? 32 : 12, bottom: 4, left: 4 }}
               barCategoryGap={6}
             >
               <CartesianGrid
@@ -115,7 +122,7 @@ export default function SchoolSessionBar({ onSchoolClick }: Props) {
                 stroke={AXIS_COLOR}
                 tickLine={false}
                 axisLine={{ stroke: GRID_COLOR }}
-                width={180}
+                width={yAxisWidth}
               />
               <Tooltip
                 cursor={{ fill: "#f1f5f9" }}

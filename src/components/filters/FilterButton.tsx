@@ -10,19 +10,29 @@ import {
   schoolId,
   shortSchoolName,
 } from "@/lib/parse";
+import { useIsSm } from "@/lib/useMediaQuery";
 import MultiSelect from "./MultiSelect";
 import SingleSelect from "./SingleSelect";
+
+interface Pos {
+  top: number;
+  left?: number;
+  right?: number;
+  width?: number;
+  maxHeight: number;
+}
 
 export default function FilterButton() {
   const { filter, setFilter, reset, hasActive } = useFilter();
   const loc = useLocation();
   const nav = useNavigate();
+  const isSm = useIsSm();
   const onDetail = loc.pathname.startsWith("/school/");
   const available = useMemo(() => availableFilterOptions(filter), [filter]);
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const [pos, setPos] = useState<Pos | null>(null);
 
   const activeCount =
     (filter.month !== "all" ? 1 : 0) +
@@ -35,10 +45,21 @@ export default function FilterButton() {
     if (!open || !buttonRef.current) return;
     const compute = () => {
       const r = buttonRef.current!.getBoundingClientRect();
-      setPos({
-        top: r.bottom + 10,
-        right: Math.max(8, window.innerWidth - r.right),
-      });
+      const viewportH = window.innerHeight;
+      const top = r.bottom + 10;
+      const maxHeight = Math.min(viewportH - top - 12, 640);
+      if (isSm) {
+        // Desktop: dropdown anchored under the button (right-aligned).
+        setPos({
+          top,
+          right: Math.max(8, window.innerWidth - r.right),
+          width: 420,
+          maxHeight,
+        });
+      } else {
+        // Mobile: full-width sheet, ~8px margin each side.
+        setPos({ top, left: 8, right: 8, maxHeight });
+      }
     };
     compute();
     window.addEventListener("scroll", compute, true);
@@ -47,7 +68,7 @@ export default function FilterButton() {
       window.removeEventListener("scroll", compute, true);
       window.removeEventListener("resize", compute);
     };
-  }, [open]);
+  }, [open, isSm]);
 
   useEffect(() => {
     if (!open) return;
@@ -88,7 +109,6 @@ export default function FilterButton() {
       } else if (next.length === 0) {
         nav("/dashboard");
       }
-      // multi-select on detail: leave URL, filter still applies elsewhere
     }
   };
 
@@ -99,17 +119,18 @@ export default function FilterButton() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={clsx(
-          "relative inline-flex items-center gap-1.5 rounded-full border bg-white px-3.5 py-1.5 text-xs font-semibold transition",
+          "relative inline-flex items-center gap-1.5 rounded-full border bg-white px-2.5 py-1.5 text-xs font-semibold transition sm:px-3.5",
           open || hasActive
             ? "border-accent-300 text-accent-700 ring-2 ring-accent-100"
             : "border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50",
         )}
         aria-expanded={open}
+        aria-label="Filters"
       >
         <FunnelIcon />
-        Filters
+        <span className="hidden sm:inline">Filters</span>
         {activeCount > 0 && (
-          <span className="ml-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-accent-600 px-1 text-[10px] font-bold text-white">
+          <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-accent-600 px-1 text-[10px] font-bold text-white sm:ml-1">
             {activeCount}
           </span>
         )}
@@ -123,102 +144,106 @@ export default function FilterButton() {
             style={{
               position: "fixed",
               top: pos.top,
+              left: pos.left,
               right: pos.right,
-              width: 420,
+              width: pos.width,
               maxWidth: "calc(100vw - 16px)",
+              maxHeight: pos.maxHeight,
               zIndex: 900,
             }}
-            className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-cardHover animate-popIn"
+            className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-cardHover animate-popIn"
           >
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-              <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent-50 text-accent-600">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent-50 text-accent-600">
                   <FunnelIcon />
                 </span>
-                <div>
+                <div className="min-w-0">
                   <div className="text-[13.5px] font-semibold text-slate-900">
                     Filters
                   </div>
-                  <div className="text-[11px] text-slate-500">
-                    Showing only options that exist in your data
+                  <div className="truncate text-[11px] text-slate-500">
+                    Only showing options that exist in your data
                   </div>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                className="shrink-0 rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                 aria-label="Close"
               >
                 <CloseIcon />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 px-4 py-4">
-              {available.years.length > 0 && (
-                <SingleSelect
-                  label="Year"
-                  options={yearOptions}
-                  value={filter.year}
-                  onChange={(v) => setFilter((f) => ({ ...f, year: v }))}
-                />
-              )}
-              {available.months.length > 0 && (
-                <SingleSelect
-                  label="Month"
-                  options={monthOptions}
-                  value={filter.month}
-                  onChange={(v) => setFilter((f) => ({ ...f, month: v }))}
-                />
-              )}
-              {available.schools.length > 0 && (
-                <div className="col-span-2">
-                  <MultiSelect
-                    label="School"
-                    options={available.schools}
-                    value={filter.schools}
-                    onChange={handleSchoolChange}
-                    placeholder="All schools"
-                    formatOption={(o) => shortSchoolName(o, 36)}
+            <div className="flex-1 overflow-y-auto scrollbar-thin">
+              <div className="grid grid-cols-1 gap-3 px-4 py-4 sm:grid-cols-2">
+                {available.years.length > 0 && (
+                  <SingleSelect
+                    label="Year"
+                    options={yearOptions}
+                    value={filter.year}
+                    onChange={(v) => setFilter((f) => ({ ...f, year: v }))}
                   />
-                </div>
-              )}
-              {available.courses.length > 0 && (
-                <div className="col-span-2">
+                )}
+                {available.months.length > 0 && (
+                  <SingleSelect
+                    label="Month"
+                    options={monthOptions}
+                    value={filter.month}
+                    onChange={(v) => setFilter((f) => ({ ...f, month: v }))}
+                  />
+                )}
+                {available.schools.length > 0 && (
+                  <div className="sm:col-span-2">
+                    <MultiSelect
+                      label="School"
+                      options={available.schools}
+                      value={filter.schools}
+                      onChange={handleSchoolChange}
+                      placeholder="All schools"
+                      formatOption={(o) => shortSchoolName(o, 36)}
+                    />
+                  </div>
+                )}
+                {available.courses.length > 0 && (
+                  <div className="sm:col-span-2">
+                    <MultiSelect
+                      label="Course"
+                      options={available.courses}
+                      value={filter.courses}
+                      onChange={(next) =>
+                        setFilter((f) => ({ ...f, courses: next }))
+                      }
+                      placeholder="All courses"
+                      formatOption={formatCourseLabel}
+                    />
+                  </div>
+                )}
+                {available.divisions.length > 0 && (
                   <MultiSelect
-                    label="Course"
-                    options={available.courses}
-                    value={filter.courses}
+                    label="Division"
+                    options={available.divisions}
+                    value={filter.divisions}
                     onChange={(next) =>
-                      setFilter((f) => ({ ...f, courses: next }))
+                      setFilter((f) => ({ ...f, divisions: next }))
                     }
-                    placeholder="All courses"
-                    formatOption={formatCourseLabel}
+                    placeholder="All divisions"
                   />
-                </div>
-              )}
-              {available.divisions.length > 0 && (
-                <MultiSelect
-                  label="Division"
-                  options={available.divisions}
-                  value={filter.divisions}
-                  onChange={(next) =>
-                    setFilter((f) => ({ ...f, divisions: next }))
-                  }
-                  placeholder="All divisions"
-                />
-              )}
-              {available.genders.length > 0 && (
-                <MultiSelect
-                  label="Gender"
-                  options={available.genders}
-                  value={filter.genders}
-                  onChange={(next) =>
-                    setFilter((f) => ({ ...f, genders: next }))
-                  }
-                  placeholder="All"
-                />
-              )}
+                )}
+                {available.genders.length > 0 && (
+                  <MultiSelect
+                    label="Gender"
+                    options={available.genders}
+                    value={filter.genders}
+                    onChange={(next) =>
+                      setFilter((f) => ({ ...f, genders: next }))
+                    }
+                    placeholder="All"
+                  />
+                )}
+              </div>
             </div>
 
             <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/60 px-4 py-2.5">

@@ -31,11 +31,11 @@ export default function KpiTile({
 }: KpiTileProps) {
   const t = TONES[tone];
   return (
-    <div className="card card-hover group relative flex flex-col p-5">
-      <div className="flex items-start justify-between gap-3">
+    <div className="card card-hover group relative flex flex-col p-4 sm:p-5">
+      <div className="flex items-start justify-between gap-2">
         <div
           className={clsx(
-            "flex h-10 w-10 items-center justify-center rounded-xl",
+            "flex h-9 w-9 items-center justify-center rounded-xl sm:h-10 sm:w-10",
             t.iconBg,
             t.iconFg,
           )}
@@ -43,20 +43,24 @@ export default function KpiTile({
           {icon}
         </div>
         <div className="text-right">
-          <div className="text-[12px] font-medium text-slate-500">{label}</div>
+          <div className="text-[11.5px] font-medium text-slate-500 sm:text-[12px]">
+            {label}
+          </div>
         </div>
       </div>
 
-      <div className="mt-4 flex items-baseline gap-1.5">
-        <div className="num text-[30px] font-bold leading-none tracking-tight text-slate-900">
+      <div className="mt-3 flex items-baseline gap-1.5 sm:mt-4">
+        <div className="num text-[24px] font-bold leading-none tracking-tight text-slate-900 sm:text-[30px]">
           {value}
         </div>
         {unit && (
-          <div className="text-sm font-medium text-slate-500">{unit}</div>
+          <div className="text-xs font-medium text-slate-500 sm:text-sm">{unit}</div>
         )}
       </div>
 
-      {hint && <div className="mt-1.5 text-[12px] text-slate-500">{hint}</div>}
+      {hint && (
+        <div className="mt-1.5 text-[11.5px] text-slate-500 sm:text-[12px]">{hint}</div>
+      )}
     </div>
   );
 }
