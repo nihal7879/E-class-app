@@ -5,7 +5,6 @@ const NAV = [
   { to: "/dashboard", label: "Institute Summary", icon: BarsIcon, available: true },
   { to: "#", label: "Video Analytics", icon: VideoIcon, available: false },
   { to: "#", label: "MCQ Analytics", icon: QuizIcon, available: false },
-  { to: "#", label: "Engagement", icon: SparkIcon, available: false },
 ];
 
 export default function Sidebar() {
