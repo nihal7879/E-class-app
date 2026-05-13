@@ -27,7 +27,7 @@ export default function CommandPalette() {
     const navItems: Item[] = [
       {
         kind: "nav",
-        label: "Go to Login Summary",
+        label: "Go to Institute Summary",
         hint: "Dashboard",
         onSelect: () => nav("/dashboard"),
       },

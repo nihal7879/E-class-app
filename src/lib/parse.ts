@@ -1,9 +1,11 @@
 import loginsJson from "@/data/loginHistory.json";
 import videosJson from "@/data/videoUsage.json";
-import type { LoginRow, VideoRow } from "./types";
+import mcqJson from "@/data/mcqReport.json";
+import type { LoginRow, McqRow, VideoRow } from "./types";
 
 export const LOGIN_ROWS: LoginRow[] = loginsJson as LoginRow[];
 export const VIDEO_ROWS: VideoRow[] = videosJson as VideoRow[];
+export const MCQ_ROWS: McqRow[] = mcqJson as McqRow[];
 
 export const MONTH_LABELS = [
   "Jan",

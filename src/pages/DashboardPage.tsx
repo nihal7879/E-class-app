@@ -1,7 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import KpiStrip from "@/components/kpi/KpiStrip";
-import SchoolTrendChart from "@/components/charts/SchoolTrendChart";
-import SchoolSessionBar from "@/components/charts/SchoolSessionBar";
+import SchoolCompositionChart from "@/components/charts/SchoolCompositionChart";
 import ComingSoonCard from "@/components/placeholders/ComingSoonCard";
 import SectionHeader from "@/components/ui/SectionHeader";
 import { schoolId } from "@/lib/parse";
@@ -16,27 +15,10 @@ export default function DashboardPage() {
 
       <div>
         <SectionHeader
-          title="Login trends"
-          description="See how each school's daily login activity changes over time."
+          title="Overall school activity"
+          description="See how each school splits its time across logins, sessions, video usage and MCQ attempts — plus how many courses they're learning from."
         />
-        <SchoolTrendChart onSchoolClick={goSchool} />
-      </div>
-
-      <div>
-        <SectionHeader
-          title="Compare schools"
-          description="Side-by-side comparison of activity across your schools."
-        />
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
-          <div className="xl:col-span-2">
-            <SchoolSessionBar onSchoolClick={goSchool} />
-          </div>
-          <ComingSoonCard
-            title="Device usage"
-            description="Find out who logs in from mobile, laptop, or tablet. We'll turn this on once device info is added to your exports."
-            icon={<DeviceIcon />}
-          />
-        </div>
+        <SchoolCompositionChart onSchoolClick={goSchool} />
       </div>
 
       <div>
@@ -66,24 +48,6 @@ export default function DashboardPage() {
   );
 }
 
-function DeviceIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="2" y="6" width="14" height="10" rx="2" />
-      <rect x="16" y="9" width="6" height="11" rx="1.5" />
-      <line x1="6" y1="20" x2="12" y2="20" />
-    </svg>
-  );
-}
 function VideoIcon() {
   return (
     <svg

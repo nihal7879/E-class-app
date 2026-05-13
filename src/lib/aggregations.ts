@@ -1,5 +1,6 @@
 import {
   LOGIN_ROWS,
+  MCQ_ROWS,
   VIDEO_ROWS,
   getMonth,
   getYear,
@@ -10,6 +11,8 @@ import {
 import type {
   FilterState,
   LoginRow,
+  McqRow,
+  SchoolCompositionStat,
   SchoolSessionStat,
   SchoolTrendPoint,
   StudentStat,
@@ -48,6 +51,18 @@ export function filterVideos(rows: VideoRow[], f: FilterState): VideoRow[] {
     (r) =>
       matchesYear(r.LastAccessDate, f.year) &&
       matchesMonth(r.LastAccessDate, f.month) &&
+      matchesSchool(r.School, f.schools) &&
+      (f.courses.length === 0 || f.courses.includes(r.Course)) &&
+      (f.divisions.length === 0 || f.divisions.includes(r.Division)) &&
+      (f.genders.length === 0 || f.genders.includes(r.Gender)),
+  );
+}
+
+export function filterMcq(rows: McqRow[], f: FilterState): McqRow[] {
+  return rows.filter(
+    (r) =>
+      matchesYear(r.AttemptedDate, f.year) &&
+      matchesMonth(r.AttemptedDate, f.month) &&
       matchesSchool(r.School, f.schools) &&
       (f.courses.length === 0 || f.courses.includes(r.Course)) &&
       (f.divisions.length === 0 || f.divisions.includes(r.Division)) &&
@@ -270,6 +285,63 @@ export function computeSchoolStats(f: FilterState): SchoolSessionStat[] {
   }
   for (const [school, s] of map) s.uniqueStudents = studentsBySchool.get(school)!.size;
   return Array.from(map.values()).sort((a, b) => b.logins - a.logins);
+}
+
+// ---------- School activity composition (logins / sessions / videos / mcq + courses) ----------
+
+export function computeSchoolComposition(f: FilterState): SchoolCompositionStat[] {
+  const logins = filterLogins(LOGIN_ROWS, f);
+  const videos = filterVideos(VIDEO_ROWS, f);
+  const mcq = filterMcq(MCQ_ROWS, f);
+
+  const map = new Map<string, SchoolCompositionStat>();
+  const coursesBySchool = new Map<string, Set<string>>();
+  const addCourse = (school: string, course: string) => {
+    if (!course) return;
+    if (!coursesBySchool.has(school)) coursesBySchool.set(school, new Set());
+    coursesBySchool.get(school)!.add(course);
+  };
+  const ensure = (school: string): SchoolCompositionStat => {
+    let cur = map.get(school);
+    if (!cur) {
+      cur = {
+        school,
+        logins: 0,
+        sessions: 0,
+        videoViews: 0,
+        videoDurationMs: 0,
+        mcqAttempts: 0,
+        total: 0,
+        courses: 0,
+      };
+      map.set(school, cur);
+    }
+    return cur;
+  };
+
+  for (const r of logins) {
+    const s = ensure(r.School);
+    s.logins += 1;
+    if (r.SessionTime > 0) s.sessions += 1;
+  }
+  for (const r of videos) {
+    const s = ensure(r.School);
+    s.videoViews += 1;
+    s.videoDurationMs += r.TotalViewDuration || 0;
+    addCourse(r.School, r.Course);
+  }
+  for (const r of mcq) {
+    const s = ensure(r.School);
+    s.mcqAttempts += 1;
+    addCourse(r.School, r.Course);
+  }
+
+  for (const s of map.values()) {
+    s.total = s.logins + s.sessions + s.videoViews + s.mcqAttempts;
+    s.courses = coursesBySchool.get(s.school)?.size || 0;
+  }
+
+  return Array.from(map.values()).sort((a, b) => b.total - a.total);
 }
 
 // ---------- Student-level (for school detail) ----------

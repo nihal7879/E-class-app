@@ -1,5 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useCommandPalette } from "@/lib/commandPalette";
+import { useFilter } from "@/lib/filterContext";
 import FilterButton from "@/components/filters/FilterButton";
 
 interface Props {
@@ -10,7 +11,13 @@ export default function Topbar({ onMenuClick }: Props) {
   const loc = useLocation();
   const nav = useNavigate();
   const { setOpen: setPaletteOpen } = useCommandPalette();
+  const { reset: resetFilter } = useFilter();
   const onDetail = loc.pathname.startsWith("/school/");
+
+  const handleBack = () => {
+    resetFilter();
+    nav("/dashboard");
+  };
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 sm:px-6">
@@ -26,7 +33,7 @@ export default function Topbar({ onMenuClick }: Props) {
 
         {onDetail && (
           <button
-            onClick={() => nav(-1)}
+            onClick={handleBack}
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 sm:px-2.5 sm:py-1.5"
             aria-label="Back"
           >
@@ -49,7 +56,7 @@ export default function Topbar({ onMenuClick }: Props) {
 
         <div className="min-w-0">
           <h1 className="truncate text-[14px] font-semibold text-slate-900 sm:text-[15px]">
-            {onDetail ? "School details" : "Login Summary"}
+            {onDetail ? "School details" : "Institute Summary"}
           </h1>
           <p className="hidden truncate text-[11.5px] text-slate-500 sm:block">
             {onDetail

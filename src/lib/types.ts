@@ -36,6 +36,28 @@ export interface VideoRow {
   LastAccessTime: number;
 }
 
+export interface McqRow {
+  "Student/Teacher": UserKind;
+  School: string;
+  UserID: number;
+  EnrollmentID: string;
+  StudentName: string;
+  Division: string;
+  EmailID: string;
+  Gender: "Male" | "Female" | string;
+  Course: string;
+  Subject: string;
+  Chapter: string;
+  TotalQuestion: number;
+  RightQuestionCount: number;
+  TotalMarks: number;
+  MarksObtained: number;
+  Percentage: number;
+  AttemptedDate: string; // YYYY-MM-DD
+  AttemptedTime: number;
+  TimeSpent: number;
+}
+
 export interface FilterState {
   year: number | "all";
   month: number | "all"; // 1..12
@@ -56,6 +78,17 @@ export interface SchoolSessionStat {
   sessions: number;
   totalSessionMs: number;
   uniqueStudents: number;
+}
+
+export interface SchoolCompositionStat {
+  school: string;
+  logins: number;
+  sessions: number;
+  videoViews: number;
+  videoDurationMs: number; // total watch time across videos
+  mcqAttempts: number;
+  total: number; // sum of the four metrics
+  courses: number; // unique courses for this school
 }
 
 export interface StudentStat {

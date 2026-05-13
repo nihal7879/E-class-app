@@ -4,7 +4,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import clsx from "clsx";
 
 const NAV = [
-  { to: "/dashboard", label: "Login Summary", icon: BarsIcon, available: true },
+  { to: "/dashboard", label: "Institute Summary", icon: BarsIcon, available: true },
   { to: "#", label: "Video Analytics", icon: VideoIcon, available: false },
   { to: "#", label: "MCQ Analytics", icon: QuizIcon, available: false },
   { to: "#", label: "Engagement", icon: SparkIcon, available: false },

@@ -37,9 +37,7 @@ export default function FilterButton() {
   const activeCount =
     (filter.month !== "all" ? 1 : 0) +
     filter.schools.length +
-    filter.courses.length +
-    filter.divisions.length +
-    filter.genders.length;
+    filter.courses.length;
 
   useLayoutEffect(() => {
     if (!open || !buttonRef.current) return;
@@ -220,28 +218,6 @@ export default function FilterButton() {
                       formatOption={formatCourseLabel}
                     />
                   </div>
-                )}
-                {available.divisions.length > 0 && (
-                  <MultiSelect
-                    label="Division"
-                    options={available.divisions}
-                    value={filter.divisions}
-                    onChange={(next) =>
-                      setFilter((f) => ({ ...f, divisions: next }))
-                    }
-                    placeholder="All divisions"
-                  />
-                )}
-                {available.genders.length > 0 && (
-                  <MultiSelect
-                    label="Gender"
-                    options={available.genders}
-                    value={filter.genders}
-                    onChange={(next) =>
-                      setFilter((f) => ({ ...f, genders: next }))
-                    }
-                    placeholder="All"
-                  />
                 )}
               </div>
             </div>
