@@ -9,8 +9,7 @@ import { useFilter } from "@/lib/filterContext";
 import { formatNumber, schoolFromId, schoolId as toSchoolId } from "@/lib/parse";
 import KpiTile from "@/components/kpi/KpiTile";
 import DailyActivityChart from "@/components/charts/DailyActivityChart";
-import StudentSessionChart from "@/components/charts/StudentSessionChart";
-import UsageDurationChart from "@/components/charts/UsageDurationChart";
+import StudentBreakdownChart from "@/components/charts/StudentBreakdownChart";
 import StudentList from "@/components/charts/StudentList";
 import SectionHeader from "@/components/ui/SectionHeader";
 
@@ -131,10 +130,7 @@ export default function SchoolDetailPage() {
           title="Per-student breakdown"
           description="Sessions and usage time by Enrollment ID."
         />
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-          <StudentSessionChart students={students} />
-          <UsageDurationChart students={students} />
-        </div>
+        <StudentBreakdownChart students={students} />
       </div>
 
       <div>
