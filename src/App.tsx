@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { FilterProvider } from "@/lib/filterContext";
 import { CommandPaletteProvider } from "@/lib/commandPalette";
@@ -9,8 +10,18 @@ import CourseSubjectsPage from "@/pages/CourseSubjectsPage";
 import CourseOverviewPage from "@/pages/CourseOverviewPage";
 import SubjectDetailPage from "@/pages/SubjectDetailPage";
 import CommandPalette from "@/components/ui/CommandPalette";
+import Loader from "@/components/ui/Loader";
 
 export default function App() {
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const t = setTimeout(() => setLoading(false), 1200);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (loading) return <Loader />;
+
   return (
     <FilterProvider>
       <CommandPaletteProvider>
