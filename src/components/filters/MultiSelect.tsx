@@ -217,17 +217,6 @@ export default function MultiSelect({
                 );
               })}
             </ul>
-            {value.length > 0 && (
-              <div className="border-t border-slate-100 bg-slate-50/60 px-3 py-2 text-right">
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="rounded-full bg-accent-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-accent-700"
-                >
-                  Done
-                </button>
-              </div>
-            )}
           </div>,
           document.body,
         )}

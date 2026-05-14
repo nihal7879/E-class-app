@@ -7,7 +7,6 @@ import {
   type ReactNode,
   type SetStateAction,
 } from "react";
-import { getCatalogue } from "./aggregations";
 import type { FilterState } from "./types";
 
 interface FilterContextValue {
@@ -18,9 +17,8 @@ interface FilterContextValue {
 }
 
 const initialFilter = (): FilterState => {
-  const cat = getCatalogue();
   return {
-    year: cat.years[0] ?? "all",
+    year: "all",
     month: "all",
     schools: [],
     courses: [],
@@ -43,7 +41,9 @@ export function FilterProvider({ children }: { children: ReactNode }) {
         filter.schools.length > 0 ||
         filter.courses.length > 0 ||
         filter.divisions.length > 0 ||
-        filter.genders.length > 0,
+        filter.genders.length > 0 ||
+        Boolean(filter.dateFrom) ||
+        Boolean(filter.dateTo),
     }),
     [filter],
   );

@@ -65,6 +65,8 @@ export interface FilterState {
   courses: string[]; // empty = all
   divisions: string[]; // empty = all
   genders: string[]; // empty = all
+  dateFrom?: string; // YYYY-MM-DD — when set, overrides year/month for date matching
+  dateTo?: string; // YYYY-MM-DD — inclusive
 }
 
 export interface SchoolTrendPoint {

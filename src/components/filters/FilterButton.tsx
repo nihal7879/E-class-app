@@ -1,18 +1,23 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type SyntheticEvent,
+} from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
 import { availableFilterOptions } from "@/lib/aggregations";
 import { useFilter } from "@/lib/filterContext";
 import {
-  MONTH_LABELS,
   formatCourseLabel,
   schoolId,
   shortSchoolName,
 } from "@/lib/parse";
 import { useIsSm } from "@/lib/useMediaQuery";
 import MultiSelect from "./MultiSelect";
-import SingleSelect from "./SingleSelect";
 
 interface Pos {
   top: number;
@@ -35,9 +40,9 @@ export default function FilterButton() {
   const [pos, setPos] = useState<Pos | null>(null);
 
   const activeCount =
-    (filter.month !== "all" ? 1 : 0) +
     filter.schools.length +
-    filter.courses.length;
+    filter.courses.length +
+    (filter.dateFrom || filter.dateTo ? 1 : 0);
 
   useLayoutEffect(() => {
     if (!open || !buttonRef.current) return;
@@ -88,16 +93,6 @@ export default function FilterButton() {
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
-
-  const yearOptions = [
-    { value: "all" as const, label: "All years" },
-    ...available.years.map((y) => ({ value: y, label: String(y) })),
-  ];
-
-  const monthOptions = [
-    { value: "all" as const, label: "All months" },
-    ...available.months.map((m) => ({ value: m, label: MONTH_LABELS[m - 1] })),
-  ];
 
   const handleSchoolChange = (next: string[]) => {
     setFilter((f) => ({ ...f, schools: next }));
@@ -177,22 +172,17 @@ export default function FilterButton() {
 
             <div className="flex-1 overflow-y-auto scrollbar-thin">
               <div className="grid grid-cols-1 gap-3 px-4 py-4 sm:grid-cols-2">
-                {available.years.length > 0 && (
-                  <SingleSelect
-                    label="Year"
-                    options={yearOptions}
-                    value={filter.year}
-                    onChange={(v) => setFilter((f) => ({ ...f, year: v }))}
+                <div className="sm:col-span-2">
+                  <DateRangeSection
+                    minDate={available.minDate}
+                    maxDate={available.maxDate}
+                    dateFrom={filter.dateFrom}
+                    dateTo={filter.dateTo}
+                    onChange={(dateFrom, dateTo) =>
+                      setFilter((f) => ({ ...f, dateFrom, dateTo }))
+                    }
                   />
-                )}
-                {available.months.length > 0 && (
-                  <SingleSelect
-                    label="Month"
-                    options={monthOptions}
-                    value={filter.month}
-                    onChange={(v) => setFilter((f) => ({ ...f, month: v }))}
-                  />
-                )}
+                </div>
                 {available.schools.length > 0 && (
                   <div className="sm:col-span-2">
                     <MultiSelect
@@ -222,21 +212,14 @@ export default function FilterButton() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/60 px-4 py-2.5">
+            <div className="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/60 px-4 py-2.5">
               <button
                 type="button"
                 onClick={reset}
-                disabled={!hasActive && filter.year === (available.years[0] ?? "all")}
+                disabled={!hasActive}
                 className="text-xs font-medium text-slate-500 transition hover:text-accent-600 disabled:cursor-not-allowed disabled:text-slate-300"
               >
                 Reset all
-              </button>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="rounded-full bg-accent-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-accent-700"
-              >
-                Done
               </button>
             </div>
           </div>,
@@ -277,5 +260,220 @@ function CloseIcon() {
       <line x1="18" y1="6" x2="6" y2="18" />
       <line x1="6" y1="6" x2="18" y2="18" />
     </svg>
+  );
+}
+
+function shiftDays(date: string, days: number): string {
+  const d = new Date(date + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+interface DateRangeSectionProps {
+  minDate: string;
+  maxDate: string;
+  dateFrom?: string;
+  dateTo?: string;
+  onChange: (from?: string, to?: string) => void;
+}
+
+function DateRangeSection({
+  minDate,
+  maxDate,
+  dateFrom,
+  dateTo,
+  onChange,
+}: DateRangeSectionProps) {
+  const [mode, setMode] = useState<"single" | "range">(
+    dateFrom && dateTo && dateFrom === dateTo ? "single" : "range",
+  );
+
+  const presets = useMemo(() => {
+    if (!maxDate || !minDate) return [] as { label: string; from: string; to: string }[];
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const d = String(today.getDate()).padStart(2, "0");
+    const todayStr = `${y}-${m}-${d}`;
+    const lastDayOfMonth = String(
+      new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate(),
+    ).padStart(2, "0");
+    return [
+      {
+        label: "Last 7 days",
+        from: shiftDays(todayStr, -6),
+        to: todayStr,
+      },
+      {
+        label: "Last 30 days",
+        from: shiftDays(todayStr, -29),
+        to: todayStr,
+      },
+      {
+        label: "This month",
+        from: `${y}-${m}-01`,
+        to: `${y}-${m}-${lastDayOfMonth}`,
+      },
+      { label: "All time", from: minDate, to: maxDate },
+    ];
+  }, [minDate, maxDate]);
+
+  const applyPreset = (from: string, to: string) => {
+    setMode("range");
+    onChange(from, to);
+  };
+
+  const handleSingle = (v: string) => {
+    if (!v) {
+      onChange(undefined, undefined);
+      return;
+    }
+    onChange(v, v);
+  };
+
+  const handleFrom = (v: string) => {
+    const next = v || undefined;
+    let to = dateTo;
+    if (next && to && next > to) to = next;
+    onChange(next, to);
+  };
+
+  const handleTo = (v: string) => {
+    const next = v || undefined;
+    let from = dateFrom;
+    if (next && from && next < from) from = next;
+    onChange(from, next);
+  };
+
+  const singleValue = dateFrom && dateFrom === dateTo ? dateFrom : "";
+  const hasActive = Boolean(dateFrom || dateTo);
+
+  const openPicker = (e: SyntheticEvent<HTMLInputElement>) => {
+    const el = e.currentTarget as HTMLInputElement & { showPicker?: () => void };
+    if (typeof el.showPicker === "function") {
+      try {
+        el.showPicker();
+      } catch {
+        // Some browsers throw if called without a user gesture — fail silently.
+      }
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          Date
+        </span>
+        <div className="flex items-center gap-1 rounded-full bg-white p-0.5 text-[11px] ring-1 ring-slate-200">
+          <button
+            type="button"
+            onClick={() => {
+              setMode("single");
+              if (dateFrom && dateTo && dateFrom !== dateTo) onChange(dateFrom, dateFrom);
+            }}
+            className={clsx(
+              "rounded-full px-2.5 py-0.5 font-medium transition",
+              mode === "single"
+                ? "bg-accent-600 text-white"
+                : "text-slate-500 hover:text-slate-800",
+            )}
+          >
+            Single date
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("range")}
+            className={clsx(
+              "rounded-full px-2.5 py-0.5 font-medium transition",
+              mode === "range"
+                ? "bg-accent-600 text-white"
+                : "text-slate-500 hover:text-slate-800",
+            )}
+          >
+            Range
+          </button>
+        </div>
+      </div>
+
+      {presets.length > 0 && mode === "range" && (
+        <div className="mb-2.5 flex flex-wrap gap-1.5">
+          {presets.map((p) => {
+            const isAllTime = p.label === "All time";
+            const isActive =
+              (dateFrom === p.from && dateTo === p.to) ||
+              (isAllTime && !dateFrom && !dateTo);
+            return (
+              <button
+                key={p.label}
+                type="button"
+                onClick={() => applyPreset(p.from, p.to)}
+                className={clsx(
+                  "rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition",
+                  isActive
+                    ? "border-accent-300 bg-accent-50 text-accent-700"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900",
+                )}
+              >
+                {p.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {mode === "single" ? (
+        <input
+          type="date"
+          value={singleValue}
+          onChange={(e) => handleSingle(e.target.value)}
+          onClick={openPicker}
+          className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 outline-none focus:border-accent-400 focus:ring-2 focus:ring-accent-100"
+        />
+      ) : (
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block">
+            <span className="mb-1 block text-[10.5px] font-medium uppercase tracking-wide text-slate-500">
+              From
+            </span>
+            <input
+              type="date"
+              value={dateFrom ?? ""}
+              onChange={(e) => handleFrom(e.target.value)}
+              onClick={openPicker}
+              className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 outline-none focus:border-accent-400 focus:ring-2 focus:ring-accent-100"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-[10.5px] font-medium uppercase tracking-wide text-slate-500">
+              To
+            </span>
+            <input
+              type="date"
+              value={dateTo ?? ""}
+              min={dateFrom || undefined}
+              onChange={(e) => handleTo(e.target.value)}
+              onClick={openPicker}
+              className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 outline-none focus:border-accent-400 focus:ring-2 focus:ring-accent-100"
+            />
+          </label>
+        </div>
+      )}
+
+      {hasActive && (
+        <div className="mt-2 flex items-center justify-between text-[11px]">
+          <span className="text-slate-500">
+            Overrides Year / Month selection
+          </span>
+          <button
+            type="button"
+            onClick={() => onChange(undefined, undefined)}
+            className="font-medium text-slate-500 transition hover:text-accent-600"
+          >
+            Clear date
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

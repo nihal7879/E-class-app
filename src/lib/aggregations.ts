@@ -19,12 +19,15 @@ import type {
   VideoRow,
 } from "./types";
 
-function matchesYear(date: string, year: FilterState["year"]) {
-  return year === "all" || getYear(date) === year;
-}
-
-function matchesMonth(date: string, month: FilterState["month"]) {
-  return month === "all" || getMonth(date) === month;
+function matchesPeriod(date: string, f: FilterState): boolean {
+  if (f.dateFrom || f.dateTo) {
+    if (f.dateFrom && date < f.dateFrom) return false;
+    if (f.dateTo && date > f.dateTo) return false;
+    return true;
+  }
+  if (f.year !== "all" && getYear(date) !== f.year) return false;
+  if (f.month !== "all" && getMonth(date) !== f.month) return false;
+  return true;
 }
 
 function matchesSchool(school: string, schools: string[]) {
@@ -37,8 +40,7 @@ export function filterLogins(rows: LoginRow[], f: FilterState): LoginRow[] {
 
   return rows.filter(
     (r) =>
-      matchesYear(r.LoginDate, f.year) &&
-      matchesMonth(r.LoginDate, f.month) &&
+      matchesPeriod(r.LoginDate, f) &&
       matchesSchool(r.School, f.schools) &&
       (f.divisions.length === 0 || f.divisions.includes(r.Division)) &&
       (f.genders.length === 0 || f.genders.includes(r.Gender)) &&
@@ -49,8 +51,7 @@ export function filterLogins(rows: LoginRow[], f: FilterState): LoginRow[] {
 export function filterVideos(rows: VideoRow[], f: FilterState): VideoRow[] {
   return rows.filter(
     (r) =>
-      matchesYear(r.LastAccessDate, f.year) &&
-      matchesMonth(r.LastAccessDate, f.month) &&
+      matchesPeriod(r.LastAccessDate, f) &&
       matchesSchool(r.School, f.schools) &&
       (f.courses.length === 0 || f.courses.includes(r.Course)) &&
       (f.divisions.length === 0 || f.divisions.includes(r.Division)) &&
@@ -61,8 +62,7 @@ export function filterVideos(rows: VideoRow[], f: FilterState): VideoRow[] {
 export function filterMcq(rows: McqRow[], f: FilterState): McqRow[] {
   return rows.filter(
     (r) =>
-      matchesYear(r.AttemptedDate, f.year) &&
-      matchesMonth(r.AttemptedDate, f.month) &&
+      matchesPeriod(r.AttemptedDate, f) &&
       matchesSchool(r.School, f.schools) &&
       (f.courses.length === 0 || f.courses.includes(r.Course)) &&
       (f.divisions.length === 0 || f.divisions.includes(r.Division)) &&
@@ -87,6 +87,8 @@ export interface Catalogue {
   courses: string[];
   divisions: string[];
   genders: string[];
+  minDate: string; // YYYY-MM-DD — earliest date in source data
+  maxDate: string; // YYYY-MM-DD — latest date in source data
 }
 
 let _catalogue: Catalogue | null = null;
@@ -98,12 +100,20 @@ export function getCatalogue(): Catalogue {
   const courses = new Set<string>();
   const divisions = new Set<string>();
   const genders = new Set<string>();
+  let minDate = "";
+  let maxDate = "";
+  const trackDate = (d: string) => {
+    if (!d) return;
+    if (!minDate || d < minDate) minDate = d;
+    if (!maxDate || d > maxDate) maxDate = d;
+  };
   for (const r of LOGIN_ROWS) {
     years.add(getYear(r.LoginDate));
     months.add(getMonth(r.LoginDate));
     schools.add(r.School);
     if (r.Division) divisions.add(r.Division);
     if (r.Gender) genders.add(r.Gender);
+    trackDate(r.LoginDate);
   }
   for (const r of VIDEO_ROWS) {
     years.add(getYear(r.LastAccessDate));
@@ -112,6 +122,7 @@ export function getCatalogue(): Catalogue {
     if (r.Course) courses.add(r.Course);
     if (r.Division) divisions.add(r.Division);
     if (r.Gender) genders.add(r.Gender);
+    trackDate(r.LastAccessDate);
   }
   _catalogue = {
     years: Array.from(years).sort((a, b) => b - a),
@@ -120,6 +131,8 @@ export function getCatalogue(): Catalogue {
     courses: sortCourses(Array.from(courses)),
     divisions: sortAlpha(Array.from(divisions)),
     genders: sortAlpha(Array.from(genders)),
+    minDate,
+    maxDate,
   };
   return _catalogue;
 }
@@ -187,6 +200,7 @@ export function availableFilterOptions(f: FilterState): Catalogue {
   for (const d of f.divisions) divisions.add(d);
   for (const g of f.genders) genders.add(g);
 
+  const base = getCatalogue();
   return {
     years: Array.from(years).sort((a, b) => b - a),
     months: Array.from(months).sort((a, b) => a - b),
@@ -194,6 +208,8 @@ export function availableFilterOptions(f: FilterState): Catalogue {
     courses: sortCourses(Array.from(courses)),
     divisions: sortAlpha(Array.from(divisions)),
     genders: sortAlpha(Array.from(genders)),
+    minDate: base.minDate,
+    maxDate: base.maxDate,
   };
 }
 
