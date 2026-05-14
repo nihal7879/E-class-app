@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import clsx from "clsx";
 import {
   Bar,
   BarChart,
@@ -11,10 +13,16 @@ import {
 } from "recharts";
 import { computeMcqOverview } from "@/lib/aggregations";
 import { useFilter } from "@/lib/filterContext";
-import { formatCourseLabel, formatNumber } from "@/lib/parse";
+import {
+  courseId as toCourseId,
+  formatCourseLabel,
+  formatNumber,
+} from "@/lib/parse";
 import ChartCard from "./ChartCard";
 import { CustomTooltip } from "./Tooltip";
 import { AXIS_COLOR, AXIS_TICK_STYLE, GRID_COLOR, GRID_DASH } from "./theme";
+
+const TOP_N_DEFAULT = 6;
 
 // Red (low) -> green (high) accuracy scale.
 function colorForPct(pct: number): string {
@@ -36,14 +44,54 @@ function formatTime(ms: number): string {
 
 export default function McqResultsCard() {
   const { filter } = useFilter();
+  const navigate = useNavigate();
   const overview = useMemo(() => computeMcqOverview(filter), [filter]);
+  const [showAll, setShowAll] = useState(false);
 
   const hasData = overview.totalAttempts > 0;
+  const visibleCourses = useMemo(
+    () =>
+      showAll
+        ? overview.courses
+        : overview.courses.slice(0, TOP_N_DEFAULT),
+    [overview.courses, showAll],
+  );
+  const showToggle = overview.courses.length > TOP_N_DEFAULT;
+  const openCourse = (course: string) =>
+    navigate(`/course/${toCourseId(course)}`);
 
   return (
     <ChartCard
       title="MCQ results by standard"
       subtitle="Accuracy and attempts per standard, with per-subject breakdown."
+      right={
+        showToggle ? (
+          <div className="flex items-center gap-1 rounded-full bg-slate-100 p-1 text-xs">
+            <button
+              onClick={() => setShowAll(false)}
+              className={clsx(
+                "rounded-full px-3 py-1 font-medium transition",
+                !showAll
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700",
+              )}
+            >
+              Top {TOP_N_DEFAULT}
+            </button>
+            <button
+              onClick={() => setShowAll(true)}
+              className={clsx(
+                "rounded-full px-3 py-1 font-medium transition",
+                showAll
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700",
+              )}
+            >
+              All {overview.courses.length}
+            </button>
+          </div>
+        ) : undefined
+      }
     >
       {!hasData ? (
         <Empty />
@@ -76,13 +124,17 @@ export default function McqResultsCard() {
           <div>
             <div className="mb-1.5 flex items-center justify-between">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Accuracy by standard · expand for subjects
+                {showAll ? "All standards · accuracy" : "Accuracy by standard"}
               </div>
-              <div className="text-[10.5px] text-slate-400">click to drill in</div>
+              <div className="text-[10.5px] text-slate-400">click a row for all data</div>
             </div>
             <ul className="space-y-1.5">
-              {overview.topCourses.map((c) => (
-                <CourseAccuracyRow key={c.course} course={c} />
+              {visibleCourses.map((c) => (
+                <CourseAccuracyRow
+                  key={c.course}
+                  course={c}
+                  onOpen={() => openCourse(c.course)}
+                />
               ))}
             </ul>
           </div>
@@ -149,22 +201,23 @@ export default function McqResultsCard() {
 
 function CourseAccuracyRow({
   course,
+  onOpen,
 }: {
   course: import("@/lib/aggregations").McqCourseBreakdown;
+  onOpen: () => void;
 }) {
-  const [open, setOpen] = useState(false);
   const courseColor = colorForPct(course.avgPercentage);
 
   return (
-    <li className="rounded-lg border border-slate-100">
+    <li>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 text-left transition hover:bg-slate-50"
+        onClick={onOpen}
+        className="group grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-slate-100 px-3 py-2 text-left transition hover:border-slate-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-200"
       >
         <div className="min-w-0">
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-            <span className="truncate text-[12.5px] font-semibold text-slate-900">
+            <span className="truncate text-[12.5px] font-semibold text-slate-900 group-hover:text-accent-700">
               {formatCourseLabel(course.course)}
             </span>
             <span className="num shrink-0 text-[11px] text-slate-500">
@@ -192,53 +245,20 @@ function CourseAccuracyRow({
             </span>
           </div>
         </div>
-        <span
-          className="text-[10px] text-slate-400 transition"
-          style={{ transform: open ? "rotate(180deg)" : "none" }}
+        <svg
+          className="text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-accent-500"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         >
-          ▼
-        </span>
+          <polyline points="9 6 15 12 9 18" />
+        </svg>
       </button>
-
-      {open && course.subjects.length > 0 && (
-        <div className="border-t border-slate-100 bg-slate-50/60 px-3 py-2">
-          <ul className="space-y-1.5">
-            {course.subjects.slice(0, 8).map((s) => {
-              const subColor = colorForPct(s.avgPercentage);
-              return (
-                <li key={s.subject} className="flex items-center gap-2">
-                  <div className="min-w-0 flex-1 truncate text-[11.5px] text-slate-700">
-                    {s.subject}
-                  </div>
-                  <div className="h-1.5 w-[35%] overflow-hidden rounded-full bg-slate-200">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${s.avgPercentage}%`,
-                        background: subColor,
-                      }}
-                    />
-                  </div>
-                  <span
-                    className="num w-9 shrink-0 text-right text-[11.5px] font-semibold"
-                    style={{ color: subColor }}
-                  >
-                    {s.avgPercentage.toFixed(0)}%
-                  </span>
-                  <span className="num w-12 shrink-0 text-right text-[10.5px] text-slate-500">
-                    {formatNumber(s.attempts)}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-          {course.subjects.length > 8 && (
-            <div className="mt-1.5 text-[10.5px] text-slate-400">
-              + {course.subjects.length - 8} more subjects
-            </div>
-          )}
-        </div>
-      )}
     </li>
   );
 }

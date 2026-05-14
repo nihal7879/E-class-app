@@ -1,27 +1,78 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import clsx from "clsx";
 import { computeVideoUsageOverview } from "@/lib/aggregations";
 import { useFilter } from "@/lib/filterContext";
-import { formatCourseLabel, formatHours, formatNumber } from "@/lib/parse";
+import {
+  courseId as toCourseId,
+  formatCourseLabel,
+  formatHours,
+  formatNumber,
+} from "@/lib/parse";
 import ChartCard from "./ChartCard";
 import { CHART_PALETTE } from "./theme";
 
+const TOP_N_DEFAULT = 6;
+
 export default function VideoUsageCard() {
   const { filter } = useFilter();
+  const navigate = useNavigate();
   const overview = useMemo(() => computeVideoUsageOverview(filter), [filter]);
+  const [showAll, setShowAll] = useState(false);
 
   const hasData = overview.totalViews > 0;
-  const subjectPalette = useSubjectPalette(
-    overview.topCourses.flatMap((c) => c.subjects.map((s) => s.subject)),
+  const visibleCourses = useMemo(
+    () =>
+      showAll
+        ? overview.courses
+        : overview.courses.slice(0, TOP_N_DEFAULT),
+    [overview.courses, showAll],
   );
-  const maxCourseMs = overview.topCourses.reduce(
+  const subjectPalette = useSubjectPalette(
+    visibleCourses.flatMap((c) => c.subjects.map((s) => s.subject)),
+  );
+  const maxCourseMs = visibleCourses.reduce(
     (m, c) => Math.max(m, c.durationMs),
     0,
   );
+
+  const openCourse = (course: string) =>
+    navigate(`/course/${toCourseId(course)}`);
+
+  const showToggle = overview.courses.length > TOP_N_DEFAULT;
 
   return (
     <ChartCard
       title="Video usage by standard"
       subtitle="Watch time per standard, broken down by the subjects inside it."
+      right={
+        showToggle ? (
+          <div className="flex items-center gap-1 rounded-full bg-slate-100 p-1 text-xs">
+            <button
+              onClick={() => setShowAll(false)}
+              className={clsx(
+                "rounded-full px-3 py-1 font-medium transition",
+                !showAll
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700",
+              )}
+            >
+              Top {TOP_N_DEFAULT}
+            </button>
+            <button
+              onClick={() => setShowAll(true)}
+              className={clsx(
+                "rounded-full px-3 py-1 font-medium transition",
+                showAll
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700",
+              )}
+            >
+              All {overview.courses.length}
+            </button>
+          </div>
+        ) : undefined
+      }
     >
       {!hasData ? (
         <Empty />
@@ -53,17 +104,20 @@ export default function VideoUsageCard() {
           <div>
             <div className="mb-1.5 flex items-center justify-between">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Top standards · watch time, split by subject
+                {showAll
+                  ? `All standards · watch time, split by subject`
+                  : `Top standards · watch time, split by subject`}
               </div>
-              <div className="text-[10.5px] text-slate-400">hover for details</div>
+              <div className="text-[10.5px] text-slate-400">click a row for all data</div>
             </div>
             <ul className="space-y-2.5">
-              {overview.topCourses.map((c) => (
+              {visibleCourses.map((c) => (
                 <CourseRow
                   key={c.course}
                   course={c}
                   maxMs={maxCourseMs}
                   subjectPalette={subjectPalette}
+                  onOpen={() => openCourse(c.course)}
                 />
               ))}
             </ul>
@@ -80,12 +134,12 @@ interface CourseRowProps {
   course: import("@/lib/aggregations").VideoCourseBreakdown;
   maxMs: number;
   subjectPalette: Map<string, string>;
+  onOpen: () => void;
 }
 
-function CourseRow({ course, maxMs, subjectPalette }: CourseRowProps) {
+function CourseRow({ course, maxMs, subjectPalette, onOpen }: CourseRowProps) {
   const [hoverSubj, setHoverSubj] = useState<string | null>(null);
   const widthPct = maxMs > 0 ? (course.durationMs / maxMs) * 100 : 0;
-  // Up to 5 subject segments per row + "Other".
   const TOP_SUBJ = 5;
   const top = course.subjects.slice(0, TOP_SUBJ);
   const rest = course.subjects.slice(TOP_SUBJ);
@@ -113,67 +167,98 @@ function CourseRow({ course, maxMs, subjectPalette }: CourseRowProps) {
 
   return (
     <li>
-      <div className="flex items-baseline justify-between gap-3">
-        <div className="min-w-0 truncate text-[12.5px] font-semibold text-slate-900">
-          {formatCourseLabel(course.course)}
-        </div>
-        <div className="shrink-0 text-[11px] text-slate-500">
-          <span className="num font-semibold text-slate-700">
-            {formatHours(course.durationMs)}
-          </span>{" "}
-          · <span className="num">{formatNumber(course.views)}</span> views ·{" "}
-          <span className="num">{formatNumber(course.students)}</span> students
-        </div>
-      </div>
-      <div
-        className="mt-1.5 flex h-3 overflow-hidden rounded-full bg-slate-100"
-        style={{ width: `${Math.max(widthPct, 3)}%`, minWidth: 48 }}
-        onMouseLeave={() => setHoverSubj(null)}
+      <button
+        type="button"
+        onClick={onOpen}
+        className="group block w-full rounded-lg px-2 py-1.5 text-left transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-200"
       >
-        {segments.map((seg) => {
-          const pct = course.durationMs > 0 ? (seg.durationMs / course.durationMs) * 100 : 0;
-          const dim = hoverSubj && hoverSubj !== seg.key;
-          return (
-            <div
-              key={seg.key}
-              onMouseEnter={() => setHoverSubj(seg.key)}
-              style={{
-                width: `${pct}%`,
-                background: seg.color,
-                opacity: dim ? 0.25 : 1,
-              }}
-              className="h-full transition-opacity"
-              title={`${seg.label}: ${formatHours(seg.durationMs)} (${formatNumber(seg.views)} views)`}
-            />
-          );
-        })}
-      </div>
-      <div className="mt-1 flex flex-wrap gap-x-2.5 gap-y-0.5 text-[10.5px]">
-        {segments.map((seg) => {
-          const dim = hoverSubj && hoverSubj !== seg.key;
-          return (
-            <span
-              key={seg.key}
-              onMouseEnter={() => setHoverSubj(seg.key)}
-              onMouseLeave={() => setHoverSubj(null)}
-              className={
-                "inline-flex items-center gap-1 transition" +
-                (dim ? " opacity-40" : "")
-              }
-            >
-              <span
-                className="inline-block h-1.5 w-1.5 rounded-full"
-                style={{ background: seg.color }}
+        <div className="flex items-baseline justify-between gap-3">
+          <div className="min-w-0 truncate text-[12.5px] font-semibold text-slate-900 group-hover:text-accent-700">
+            {formatCourseLabel(course.course)}
+          </div>
+          <div className="shrink-0 text-[11px] text-slate-500">
+            <span className="num font-semibold text-slate-700">
+              {formatHours(course.durationMs)}
+            </span>{" "}
+            · <span className="num">{formatNumber(course.views)}</span> views ·{" "}
+            <span className="num">{formatNumber(course.students)}</span> students
+            <ChevronRight />
+          </div>
+        </div>
+        <div
+          className="mt-1.5 flex h-3 overflow-hidden rounded-full bg-slate-100"
+          style={{ width: `${Math.max(widthPct, 3)}%`, minWidth: 48 }}
+          onMouseLeave={() => setHoverSubj(null)}
+        >
+          {segments.map((seg) => {
+            const pct = course.durationMs > 0 ? (seg.durationMs / course.durationMs) * 100 : 0;
+            const dim = hoverSubj && hoverSubj !== seg.key;
+            return (
+              <div
+                key={seg.key}
+                onMouseEnter={(e) => {
+                  e.stopPropagation();
+                  setHoverSubj(seg.key);
+                }}
+                style={{
+                  width: `${pct}%`,
+                  background: seg.color,
+                  opacity: dim ? 0.25 : 1,
+                }}
+                className="h-full transition-opacity"
+                title={`${seg.label}: ${formatHours(seg.durationMs)} (${formatNumber(seg.views)} views)`}
               />
-              <span className="text-slate-600">{seg.label}</span>
-              <span className="num font-semibold text-slate-800">
-                {formatHours(seg.durationMs)}
+            );
+          })}
+        </div>
+        <div className="mt-1 flex flex-wrap gap-x-2.5 gap-y-0.5 text-[10.5px]">
+          {segments.map((seg) => {
+            const dim = hoverSubj && hoverSubj !== seg.key;
+            return (
+              <span
+                key={seg.key}
+                onMouseEnter={(e) => {
+                  e.stopPropagation();
+                  setHoverSubj(seg.key);
+                }}
+                onMouseLeave={() => setHoverSubj(null)}
+                className={
+                  "inline-flex items-center gap-1 transition" +
+                  (dim ? " opacity-40" : "")
+                }
+              >
+                <span
+                  className="inline-block h-1.5 w-1.5 rounded-full"
+                  style={{ background: seg.color }}
+                />
+                <span className="text-slate-600">{seg.label}</span>
+                <span className="num font-semibold text-slate-800">
+                  {formatHours(seg.durationMs)}
+                </span>
               </span>
-            </span>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      </button>
     </li>
+  );
+}
+
+function ChevronRight() {
+  return (
+    <svg
+      className="ml-1 inline-block opacity-0 transition group-hover:opacity-100"
+      width="11"
+      height="11"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="9 6 15 12 9 18" />
+    </svg>
   );
 }
 
