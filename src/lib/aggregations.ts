@@ -795,6 +795,220 @@ export function computeSubjectDetail(
   };
 }
 
+// ---------- Dashboard: Video usage overview ----------
+
+export interface VideoSubjectBreakdown {
+  subject: string;
+  durationMs: number;
+  views: number;
+}
+
+export interface VideoCourseBreakdown {
+  course: string;
+  durationMs: number;
+  views: number;
+  students: number;
+  subjects: VideoSubjectBreakdown[]; // sorted desc by durationMs
+}
+
+export interface VideoUsageOverview {
+  totalViews: number;
+  totalDurationMs: number;
+  uniqueStudents: number;
+  uniqueContent: number;
+  topCourses: VideoCourseBreakdown[]; // top N courses (standards) with nested subjects
+  contentTypeMix: { type: string; views: number; durationMs: number }[];
+}
+
+const VIDEO_TOP_COURSES = 6;
+
+export function computeVideoUsageOverview(f: FilterState): VideoUsageOverview {
+  const videos = filterVideos(VIDEO_ROWS, f);
+
+  const courseMap = new Map<
+    string,
+    {
+      durationMs: number;
+      views: number;
+      students: Set<number>;
+      subjects: Map<string, { durationMs: number; views: number }>;
+    }
+  >();
+  const typeMap = new Map<string, { views: number; durationMs: number }>();
+  const students = new Set<number>();
+  const content = new Set<string>();
+  let totalDurationMs = 0;
+
+  for (const r of videos) {
+    totalDurationMs += r.TotalViewDuration || 0;
+    students.add(r.UserID);
+    if (r.ContentName) content.add(`${r.Course}::${r.Subject}::${r.Chapter}::${r.ContentName}`);
+
+    if (r.Course) {
+      let c = courseMap.get(r.Course);
+      if (!c) {
+        c = {
+          durationMs: 0,
+          views: 0,
+          students: new Set<number>(),
+          subjects: new Map(),
+        };
+        courseMap.set(r.Course, c);
+      }
+      c.durationMs += r.TotalViewDuration || 0;
+      c.views += 1;
+      c.students.add(r.UserID);
+      const subjKey = r.Subject || "(Unspecified)";
+      const sub = c.subjects.get(subjKey) || { durationMs: 0, views: 0 };
+      sub.durationMs += r.TotalViewDuration || 0;
+      sub.views += 1;
+      c.subjects.set(subjKey, sub);
+    }
+
+    const typeKey = r.ContentType || "Other";
+    const t = typeMap.get(typeKey) || { views: 0, durationMs: 0 };
+    t.views += 1;
+    t.durationMs += r.TotalViewDuration || 0;
+    typeMap.set(typeKey, t);
+  }
+
+  const topCourses: VideoCourseBreakdown[] = Array.from(courseMap.entries())
+    .map(([course, v]) => ({
+      course,
+      durationMs: v.durationMs,
+      views: v.views,
+      students: v.students.size,
+      subjects: Array.from(v.subjects.entries())
+        .map(([subject, s]) => ({ subject, ...s }))
+        .sort((a, b) => b.durationMs - a.durationMs),
+    }))
+    .sort((a, b) => b.durationMs - a.durationMs)
+    .slice(0, VIDEO_TOP_COURSES);
+
+  const contentTypeMix = Array.from(typeMap.entries())
+    .map(([type, v]) => ({ type, ...v }))
+    .sort((a, b) => b.views - a.views);
+
+  return {
+    totalViews: videos.length,
+    totalDurationMs,
+    uniqueStudents: students.size,
+    uniqueContent: content.size,
+    topCourses,
+    contentTypeMix,
+  };
+}
+
+// ---------- Dashboard: MCQ overview ----------
+
+export interface McqSubjectBreakdown {
+  subject: string;
+  attempts: number;
+  avgPercentage: number;
+}
+
+export interface McqCourseBreakdown {
+  course: string;
+  attempts: number;
+  avgPercentage: number;
+  students: number;
+  subjects: McqSubjectBreakdown[]; // sorted desc by attempts
+}
+
+export interface McqOverview {
+  totalAttempts: number;
+  avgPercentage: number; // 0..100, weighted by attempt
+  uniqueStudents: number;
+  avgTimeSpentMs: number;
+  topCourses: McqCourseBreakdown[]; // grouped by standard, with subjects nested
+  scoreDistribution: { bucket: string; count: number }[];
+}
+
+const MCQ_TOP_COURSES = 6;
+
+export function computeMcqOverview(f: FilterState): McqOverview {
+  const mcq = filterMcq(MCQ_ROWS, f);
+
+  const students = new Set<number>();
+  let pctSum = 0;
+  let timeSum = 0;
+  const courseMap = new Map<
+    string,
+    {
+      attempts: number;
+      pctSum: number;
+      students: Set<number>;
+      subjects: Map<string, { attempts: number; pctSum: number }>;
+    }
+  >();
+  const buckets = [
+    { bucket: "0–20%", min: 0, max: 20, count: 0 },
+    { bucket: "20–40%", min: 20, max: 40, count: 0 },
+    { bucket: "40–60%", min: 40, max: 60, count: 0 },
+    { bucket: "60–80%", min: 60, max: 80, count: 0 },
+    { bucket: "80–100%", min: 80, max: 100.0001, count: 0 },
+  ];
+
+  for (const r of mcq) {
+    students.add(r.UserID);
+    pctSum += r.Percentage || 0;
+    timeSum += r.TimeSpent || 0;
+    if (r.Course) {
+      let c = courseMap.get(r.Course);
+      if (!c) {
+        c = {
+          attempts: 0,
+          pctSum: 0,
+          students: new Set<number>(),
+          subjects: new Map(),
+        };
+        courseMap.set(r.Course, c);
+      }
+      c.attempts += 1;
+      c.pctSum += r.Percentage || 0;
+      c.students.add(r.UserID);
+      const subjKey = r.Subject || "(Unspecified)";
+      const sub = c.subjects.get(subjKey) || { attempts: 0, pctSum: 0 };
+      sub.attempts += 1;
+      sub.pctSum += r.Percentage || 0;
+      c.subjects.set(subjKey, sub);
+    }
+    const p = r.Percentage || 0;
+    for (const b of buckets) {
+      if (p >= b.min && p < b.max) {
+        b.count += 1;
+        break;
+      }
+    }
+  }
+
+  const topCourses: McqCourseBreakdown[] = Array.from(courseMap.entries())
+    .map(([course, v]) => ({
+      course,
+      attempts: v.attempts,
+      avgPercentage: v.attempts > 0 ? v.pctSum / v.attempts : 0,
+      students: v.students.size,
+      subjects: Array.from(v.subjects.entries())
+        .map(([subject, s]) => ({
+          subject,
+          attempts: s.attempts,
+          avgPercentage: s.attempts > 0 ? s.pctSum / s.attempts : 0,
+        }))
+        .sort((a, b) => b.attempts - a.attempts),
+    }))
+    .sort((a, b) => b.attempts - a.attempts)
+    .slice(0, MCQ_TOP_COURSES);
+
+  return {
+    totalAttempts: mcq.length,
+    avgPercentage: mcq.length > 0 ? pctSum / mcq.length : 0,
+    uniqueStudents: students.size,
+    avgTimeSpentMs: mcq.length > 0 ? timeSum / mcq.length : 0,
+    topCourses,
+    scoreDistribution: buckets.map((b) => ({ bucket: b.bucket, count: b.count })),
+  };
+}
+
 export function computeSchoolDailyActivity(
   school: string,
   f: FilterState,
