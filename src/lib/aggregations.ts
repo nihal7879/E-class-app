@@ -465,6 +465,336 @@ export function computeSchoolDailyUsageHours(
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
+export function computeSchoolCourses(school: string, f: FilterState): string[] {
+  const videos = filterVideos(VIDEO_ROWS, { ...f, schools: [school] });
+  const mcq = filterMcq(MCQ_ROWS, { ...f, schools: [school] });
+  const set = new Set<string>();
+  for (const r of videos) if (r.Course) set.add(r.Course);
+  for (const r of mcq) if (r.Course) set.add(r.Course);
+  return sortCourses(Array.from(set));
+}
+
+export interface SchoolCourseStat {
+  course: string;
+  students: number;
+  subjects: number;
+  videoViews: number;
+  videoDurationMs: number;
+  mcqAttempts: number;
+}
+
+export function computeSchoolCourseStats(
+  school: string,
+  f: FilterState,
+): SchoolCourseStat[] {
+  const videos = filterVideos(VIDEO_ROWS, { ...f, schools: [school] });
+  const mcq = filterMcq(MCQ_ROWS, { ...f, schools: [school] });
+
+  const map = new Map<
+    string,
+    {
+      students: Set<number>;
+      subjects: Set<string>;
+      videoViews: number;
+      videoDurationMs: number;
+      mcqAttempts: number;
+    }
+  >();
+  const ensure = (course: string) => {
+    let cur = map.get(course);
+    if (!cur) {
+      cur = {
+        students: new Set<number>(),
+        subjects: new Set<string>(),
+        videoViews: 0,
+        videoDurationMs: 0,
+        mcqAttempts: 0,
+      };
+      map.set(course, cur);
+    }
+    return cur;
+  };
+
+  for (const r of videos) {
+    if (!r.Course) continue;
+    const c = ensure(r.Course);
+    c.videoViews += 1;
+    c.videoDurationMs += r.TotalViewDuration || 0;
+    c.students.add(r.UserID);
+    if (r.Subject) c.subjects.add(r.Subject);
+  }
+  for (const r of mcq) {
+    if (!r.Course) continue;
+    const c = ensure(r.Course);
+    c.mcqAttempts += 1;
+    c.students.add(r.UserID);
+    if (r.Subject) c.subjects.add(r.Subject);
+  }
+
+  const list: SchoolCourseStat[] = Array.from(map.entries()).map(([course, v]) => ({
+    course,
+    students: v.students.size,
+    subjects: v.subjects.size,
+    videoViews: v.videoViews,
+    videoDurationMs: v.videoDurationMs,
+    mcqAttempts: v.mcqAttempts,
+  }));
+  const order = new Map(sortCourses(list.map((x) => x.course)).map((c, i) => [c, i]));
+  list.sort((a, b) => (order.get(a.course)! - order.get(b.course)!));
+  return list;
+}
+
+export interface CourseSubjectStat {
+  subject: string;
+  students: number;
+  chapters: number;
+  videoViews: number;
+  videoDurationMs: number;
+  mcqAttempts: number;
+}
+
+export function computeCourseSubjectStats(
+  school: string,
+  course: string,
+  f: FilterState,
+): CourseSubjectStat[] {
+  const scopedFilter: FilterState = {
+    ...f,
+    schools: [school],
+    courses: [course],
+  };
+  const videos = filterVideos(VIDEO_ROWS, scopedFilter);
+  const mcq = filterMcq(MCQ_ROWS, scopedFilter);
+
+  const map = new Map<
+    string,
+    {
+      students: Set<number>;
+      chapters: Set<string>;
+      videoViews: number;
+      videoDurationMs: number;
+      mcqAttempts: number;
+    }
+  >();
+  const ensure = (subject: string) => {
+    let cur = map.get(subject);
+    if (!cur) {
+      cur = {
+        students: new Set<number>(),
+        chapters: new Set<string>(),
+        videoViews: 0,
+        videoDurationMs: 0,
+        mcqAttempts: 0,
+      };
+      map.set(subject, cur);
+    }
+    return cur;
+  };
+
+  for (const r of videos) {
+    if (r.Course !== course || !r.Subject) continue;
+    const s = ensure(r.Subject);
+    s.videoViews += 1;
+    s.videoDurationMs += r.TotalViewDuration || 0;
+    s.students.add(r.UserID);
+    if (r.Chapter) s.chapters.add(r.Chapter);
+  }
+  for (const r of mcq) {
+    if (r.Course !== course || !r.Subject) continue;
+    const s = ensure(r.Subject);
+    s.mcqAttempts += 1;
+    s.students.add(r.UserID);
+    if (r.Chapter) s.chapters.add(r.Chapter);
+  }
+
+  return Array.from(map.entries())
+    .map(([subject, v]) => ({
+      subject,
+      students: v.students.size,
+      chapters: v.chapters.size,
+      videoViews: v.videoViews,
+      videoDurationMs: v.videoDurationMs,
+      mcqAttempts: v.mcqAttempts,
+    }))
+    .sort((a, b) => a.subject.localeCompare(b.subject));
+}
+
+export interface SubjectStudentStat {
+  userId: number;
+  enrollmentId: string;
+  studentName: string;
+  division: string;
+  videoViews: number;
+  videoDurationMs: number;
+  chaptersTouched: number;
+  mcqAttempts: number;
+}
+
+export interface SubjectChapterStat {
+  chapter: string;
+  students: number;
+  videoViews: number;
+  videoDurationMs: number;
+  contentItems: number;
+  mcqAttempts: number;
+}
+
+export interface SubjectDetail {
+  videoViews: number;
+  videoDurationMs: number;
+  mcqAttempts: number;
+  totalStudents: number;
+  totalChapters: number;
+  students: SubjectStudentStat[];
+  chapters: SubjectChapterStat[];
+}
+
+export function computeSubjectDetail(
+  school: string,
+  course: string,
+  subject: string,
+  f: FilterState,
+): SubjectDetail {
+  const scopedFilter: FilterState = {
+    ...f,
+    schools: [school],
+    courses: [course],
+  };
+  const videos = filterVideos(VIDEO_ROWS, scopedFilter).filter(
+    (r) => r.Subject === subject,
+  );
+  const mcq = filterMcq(MCQ_ROWS, scopedFilter).filter(
+    (r) => r.Subject === subject,
+  );
+
+  // ---- per-student ----
+  const studentMap = new Map<
+    number,
+    {
+      userId: number;
+      enrollmentId: string;
+      studentName: string;
+      division: string;
+      videoViews: number;
+      videoDurationMs: number;
+      chapters: Set<string>;
+      mcqAttempts: number;
+    }
+  >();
+  const ensureStudent = (
+    userId: number,
+    enrollmentId: string,
+    name: string,
+    division: string,
+  ) => {
+    let cur = studentMap.get(userId);
+    if (!cur) {
+      cur = {
+        userId,
+        enrollmentId,
+        studentName: name,
+        division,
+        videoViews: 0,
+        videoDurationMs: 0,
+        chapters: new Set<string>(),
+        mcqAttempts: 0,
+      };
+      studentMap.set(userId, cur);
+    }
+    return cur;
+  };
+
+  for (const r of videos) {
+    const s = ensureStudent(r.UserID, r.EnrollmentID, r.StudentName, r.Division);
+    s.videoViews += 1;
+    s.videoDurationMs += r.TotalViewDuration || 0;
+    if (r.Chapter) s.chapters.add(r.Chapter);
+  }
+  for (const r of mcq) {
+    const s = ensureStudent(r.UserID, r.EnrollmentID, r.StudentName, r.Division);
+    s.mcqAttempts += 1;
+    if (r.Chapter) s.chapters.add(r.Chapter);
+  }
+
+  const students: SubjectStudentStat[] = Array.from(studentMap.values())
+    .map((s) => ({
+      userId: s.userId,
+      enrollmentId: s.enrollmentId,
+      studentName: s.studentName,
+      division: s.division,
+      videoViews: s.videoViews,
+      videoDurationMs: s.videoDurationMs,
+      chaptersTouched: s.chapters.size,
+      mcqAttempts: s.mcqAttempts,
+    }))
+    .sort((a, b) => b.videoDurationMs - a.videoDurationMs);
+
+  // ---- per-chapter ----
+  const chapterMap = new Map<
+    string,
+    {
+      students: Set<number>;
+      videoViews: number;
+      videoDurationMs: number;
+      contentItems: Set<string>;
+      mcqAttempts: number;
+    }
+  >();
+  const ensureChapter = (chapter: string) => {
+    let cur = chapterMap.get(chapter);
+    if (!cur) {
+      cur = {
+        students: new Set<number>(),
+        videoViews: 0,
+        videoDurationMs: 0,
+        contentItems: new Set<string>(),
+        mcqAttempts: 0,
+      };
+      chapterMap.set(chapter, cur);
+    }
+    return cur;
+  };
+
+  for (const r of videos) {
+    if (!r.Chapter) continue;
+    const c = ensureChapter(r.Chapter);
+    c.students.add(r.UserID);
+    c.videoViews += 1;
+    c.videoDurationMs += r.TotalViewDuration || 0;
+    if (r.ContentName) c.contentItems.add(r.ContentName);
+  }
+  for (const r of mcq) {
+    if (!r.Chapter) continue;
+    const c = ensureChapter(r.Chapter);
+    c.students.add(r.UserID);
+    c.mcqAttempts += 1;
+  }
+
+  const chapters: SubjectChapterStat[] = Array.from(chapterMap.entries())
+    .map(([chapter, v]) => ({
+      chapter,
+      students: v.students.size,
+      videoViews: v.videoViews,
+      videoDurationMs: v.videoDurationMs,
+      contentItems: v.contentItems.size,
+      mcqAttempts: v.mcqAttempts,
+    }))
+    .sort((a, b) => b.videoDurationMs - a.videoDurationMs);
+
+  let totalDuration = 0;
+  for (const r of videos) totalDuration += r.TotalViewDuration || 0;
+
+  return {
+    videoViews: videos.length,
+    videoDurationMs: totalDuration,
+    mcqAttempts: mcq.length,
+    totalStudents: students.length,
+    totalChapters: chapters.length,
+    students,
+    chapters,
+  };
+}
+
 export function computeSchoolDailyActivity(
   school: string,
   f: FilterState,

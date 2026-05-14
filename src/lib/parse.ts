@@ -61,6 +61,22 @@ export function schoolFromId(id: string): string {
   return decodeURIComponent(id);
 }
 
+export function courseId(name: string): string {
+  return encodeURIComponent(name.trim());
+}
+
+export function courseFromId(id: string): string {
+  return decodeURIComponent(id);
+}
+
+export function subjectId(name: string): string {
+  return encodeURIComponent(name.trim());
+}
+
+export function subjectFromId(id: string): string {
+  return decodeURIComponent(id);
+}
+
 export function uniq<T>(arr: T[]): T[] {
   return Array.from(new Set(arr));
 }

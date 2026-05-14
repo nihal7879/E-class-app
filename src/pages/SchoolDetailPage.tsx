@@ -1,11 +1,12 @@
 import { useEffect, useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import {
+  computeSchoolCourses,
   computeSchoolDailyActivity,
   computeStudentStats,
 } from "@/lib/aggregations";
 import { useFilter } from "@/lib/filterContext";
-import { formatNumber, schoolFromId } from "@/lib/parse";
+import { formatNumber, schoolFromId, schoolId as toSchoolId } from "@/lib/parse";
 import KpiTile from "@/components/kpi/KpiTile";
 import DailyActivityChart from "@/components/charts/DailyActivityChart";
 import StudentSessionChart from "@/components/charts/StudentSessionChart";
@@ -34,6 +35,10 @@ export default function SchoolDetailPage() {
     () => computeSchoolDailyActivity(school, filter),
     [school, filter],
   );
+  const courseCount = useMemo(
+    () => (school ? computeSchoolCourses(school, filter).length : 0),
+    [school, filter],
+  );
 
   const topStudents = students.slice(0, 5);
   const lowStudents = students
@@ -45,6 +50,8 @@ export default function SchoolDetailPage() {
   const totalLogins = students.reduce((a, s) => a + s.logins, 0);
   const totalMs = students.reduce((a, s) => a + s.totalSessionMs, 0);
   const totalHours = totalMs / 3_600_000;
+
+  const coursesHref = school ? `/school/${toSchoolId(school)}/courses` : "#";
 
   return (
     <div className="space-y-6 pb-12">
@@ -65,13 +72,31 @@ export default function SchoolDetailPage() {
         </div>
       </div>
 
-      <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <section className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
         <KpiTile
           tone="indigo"
           label="Students"
           value={formatNumber(students.length)}
           icon={<UsersIcon />}
         />
+        <Link
+          to={coursesHref}
+          aria-label="View courses for this school"
+          className="block rounded-2xl outline-none transition focus-visible:ring-2 focus-visible:ring-accent-200"
+        >
+          <KpiTile
+            tone="emerald"
+            label="Courses"
+            value={formatNumber(courseCount)}
+            icon={<BookIcon />}
+            hint={
+              <span className="inline-flex items-center gap-1 font-medium text-emerald-700">
+                View courses
+                <ArrowRightIcon />
+              </span>
+            }
+          />
+        </Link>
         <KpiTile
           tone="rose"
           label="Total logins"
@@ -204,6 +229,40 @@ function ClockIcon() {
     >
       <circle cx="12" cy="12" r="9" />
       <polyline points="12 7 12 12 15 14" />
+    </svg>
+  );
+}
+function BookIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+    </svg>
+  );
+}
+function ArrowRightIcon() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="5" y1="12" x2="19" y2="12" />
+      <polyline points="12 5 19 12 12 19" />
     </svg>
   );
 }
