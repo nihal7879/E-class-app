@@ -8,6 +8,7 @@ import {
   formatCourseLabel,
   formatHours,
   formatNumber,
+  sortCourses,
 } from "@/lib/parse";
 import ChartCard from "./ChartCard";
 import { CHART_PALETTE } from "./theme";
@@ -21,13 +22,17 @@ export default function VideoUsageCard() {
   const [showAll, setShowAll] = useState(false);
 
   const hasData = overview.totalViews > 0;
-  const visibleCourses = useMemo(
-    () =>
-      showAll
-        ? overview.courses
-        : overview.courses.slice(0, TOP_N_DEFAULT),
-    [overview.courses, showAll],
-  );
+  const visibleCourses = useMemo(() => {
+    if (!showAll) return overview.courses.slice(0, TOP_N_DEFAULT);
+    // "All" view: sort by standard ordinal (1st → 10th → …) using the same
+    // helper that orders courses elsewhere in the app.
+    const order = new Map(
+      sortCourses(overview.courses.map((c) => c.course)).map((c, i) => [c, i]),
+    );
+    return [...overview.courses].sort(
+      (a, b) => (order.get(a.course)! - order.get(b.course)!),
+    );
+  }, [overview.courses, showAll]);
   const subjectPalette = useSubjectPalette(
     visibleCourses.flatMap((c) => c.subjects.map((s) => s.subject)),
   );
@@ -39,7 +44,11 @@ export default function VideoUsageCard() {
   const openCourse = (course: string) =>
     navigate(`/course/${toCourseId(course)}`);
 
-  const showToggle = overview.courses.length > TOP_N_DEFAULT;
+  // Always show toggle when there's more than one standard — even when total
+  // equals TOP_N_DEFAULT, the two views differ in sort order (by usage vs by
+  // standard).
+  const showToggle = overview.courses.length >= 2;
+  const topLabel = Math.min(TOP_N_DEFAULT, overview.courses.length);
 
   return (
     <ChartCard
@@ -57,7 +66,7 @@ export default function VideoUsageCard() {
                   : "text-slate-500 hover:text-slate-700",
               )}
             >
-              Top {TOP_N_DEFAULT}
+              Top {topLabel}
             </button>
             <button
               onClick={() => setShowAll(true)}
@@ -105,7 +114,7 @@ export default function VideoUsageCard() {
             <div className="mb-1.5 flex items-center justify-between">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 {showAll
-                  ? `All standards · watch time, split by subject`
+                  ? `All standards · ordered 1st → 10th`
                   : `Top standards · watch time, split by subject`}
               </div>
               <div className="text-[10.5px] text-slate-400">click a row for all data</div>

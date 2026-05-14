@@ -17,6 +17,7 @@ import {
   courseId as toCourseId,
   formatCourseLabel,
   formatNumber,
+  sortCourses,
 } from "@/lib/parse";
 import ChartCard from "./ChartCard";
 import { CustomTooltip } from "./Tooltip";
@@ -49,14 +50,17 @@ export default function McqResultsCard() {
   const [showAll, setShowAll] = useState(false);
 
   const hasData = overview.totalAttempts > 0;
-  const visibleCourses = useMemo(
-    () =>
-      showAll
-        ? overview.courses
-        : overview.courses.slice(0, TOP_N_DEFAULT),
-    [overview.courses, showAll],
-  );
-  const showToggle = overview.courses.length > TOP_N_DEFAULT;
+  const visibleCourses = useMemo(() => {
+    if (!showAll) return overview.courses.slice(0, TOP_N_DEFAULT);
+    const order = new Map(
+      sortCourses(overview.courses.map((c) => c.course)).map((c, i) => [c, i]),
+    );
+    return [...overview.courses].sort(
+      (a, b) => (order.get(a.course)! - order.get(b.course)!),
+    );
+  }, [overview.courses, showAll]);
+  const showToggle = overview.courses.length >= 2;
+  const topLabel = Math.min(TOP_N_DEFAULT, overview.courses.length);
   const openCourse = (course: string) =>
     navigate(`/course/${toCourseId(course)}`);
 
@@ -76,7 +80,7 @@ export default function McqResultsCard() {
                   : "text-slate-500 hover:text-slate-700",
               )}
             >
-              Top {TOP_N_DEFAULT}
+              Top {topLabel}
             </button>
             <button
               onClick={() => setShowAll(true)}
@@ -124,7 +128,9 @@ export default function McqResultsCard() {
           <div>
             <div className="mb-1.5 flex items-center justify-between">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                {showAll ? "All standards · accuracy" : "Accuracy by standard"}
+                {showAll
+                  ? "All standards · ordered 1st → 10th"
+                  : "Accuracy by standard · sorted by attempts"}
               </div>
               <div className="text-[10.5px] text-slate-400">click a row for all data</div>
             </div>
