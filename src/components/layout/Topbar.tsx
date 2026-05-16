@@ -1,13 +1,9 @@
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import { useCommandPalette } from "@/lib/commandPalette";
 import { useFilter } from "@/lib/filterContext";
 import FilterButton from "@/components/filters/FilterButton";
 
-interface Props {
-  onMenuClick?: () => void;
-}
-
-export default function Topbar({ onMenuClick }: Props) {
+export default function Topbar() {
   const loc = useLocation();
   const nav = useNavigate();
   const { setOpen: setPaletteOpen } = useCommandPalette();
@@ -22,14 +18,25 @@ export default function Topbar({ onMenuClick }: Props) {
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 sm:px-6">
       <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-        <button
-          type="button"
-          onClick={onMenuClick}
-          className="-ml-1 flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 lg:hidden"
-          aria-label="Open menu"
+        <Link
+          to="/dashboard"
+          className="flex shrink-0 items-center gap-2 rounded-lg pr-1 transition hover:opacity-90"
+          aria-label="E-class Analytics — home"
         >
-          <MenuIcon />
-        </button>
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent-400 to-accent-600 text-white shadow-md shadow-accent-500/30">
+            <BoltIcon />
+          </span>
+          <span className="hidden leading-tight sm:block">
+            <span className="block text-[13.5px] font-bold text-slate-900">
+              E-class
+            </span>
+            <span className="block text-[10.5px] font-medium uppercase tracking-[0.14em] text-slate-500">
+              Analytics
+            </span>
+          </span>
+        </Link>
+
+        <div className="hidden h-7 w-px bg-slate-200 sm:block" />
 
         {onDetail && (
           <button
@@ -106,21 +113,10 @@ export default function Topbar({ onMenuClick }: Props) {
   );
 }
 
-function MenuIcon() {
+function BoltIcon() {
   return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <line x1="3" y1="6" x2="21" y2="6" />
-      <line x1="3" y1="12" x2="21" y2="12" />
-      <line x1="3" y1="18" x2="21" y2="18" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />
     </svg>
   );
 }

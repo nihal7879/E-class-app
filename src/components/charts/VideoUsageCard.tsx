@@ -87,7 +87,7 @@ export default function VideoUsageCard() {
         <Empty />
       ) : (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-3.5">
             <Stat
               label="Watch time"
               value={formatHours(overview.totalDurationMs)}
@@ -343,16 +343,16 @@ function Stat({
   tone: keyof typeof STAT_TONES;
 }) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-white p-2.5">
+    <div className="flex flex-col rounded-xl border border-slate-100 bg-white px-3 py-3 sm:px-3.5 sm:py-3.5">
       <span
         className={
-          "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1 " +
+          "inline-flex w-fit items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1 " +
           STAT_TONES[tone]
         }
       >
         {label}
       </span>
-      <div className="num mt-1.5 text-[18px] font-bold leading-none text-slate-900">
+      <div className="num mt-3 text-[18px] font-bold leading-none text-slate-900">
         {value}
       </div>
     </div>
