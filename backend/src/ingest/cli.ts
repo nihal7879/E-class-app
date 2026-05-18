@@ -8,8 +8,9 @@
  *     npm run ingest -- --source=excel --file="path/to/report.xlsx"
  *
  * Common options:
- *     --mode=replace   (default) wipe existing rows in login_history/video_usage/mcq_report before insert
- *     --mode=append    keep existing rows, just append
+ *     --mode=append    (default) keep existing rows; UPSERT users, INSERT logins/videos/mcq.
+ *                      Right for monthly increments (Jan stays when you load Feb).
+ *     --mode=replace   wipe all four tables, then INSERT fresh from this batch.
  *
  * Examples:
  *     npm run ingest:excel -- --file="C:/Users/dell/Downloads/OverallActivityReport_20260514_145352.xlsx"
@@ -29,7 +30,7 @@ interface Args {
 }
 
 function parseArgs(): Args {
-  const out: Args = { source: "excel", mode: "replace" };
+  const out: Args = { source: "excel", mode: "append" };
   for (const arg of process.argv.slice(2)) {
     const eq = arg.indexOf("=");
     const key = eq >= 0 ? arg.slice(0, eq) : arg;

@@ -15,31 +15,31 @@ export interface LoadResult {
 /**
  * Writes a normalized IngestBatch to MySQL inside one transaction.
  *
- *  - users           → always UPSERT on user_id (latest non-null values win)
- *  - login_history   → 'replace': TRUNCATE then INSERT.  'append': INSERT (no dedupe).
- *  - video_usage     → same as login_history
- *  - mcq_report      → same as login_history
- *
- * 'replace' is the default. It is the right choice when the source is a full export
- * (Excel report or senior's API returning a complete dump). Switch to 'append' only
- * if you receive incremental data from the API and have a way to avoid duplicates
- * upstream.
+ *  - 'append' (default): keep existing rows. UPSERT users on user_id (latest non-null
+ *                        values win). INSERT logins/videos/mcq with no dedupe. Right
+ *                        for monthly increments — Jan stays when you load Feb.
+ *                        WARNING: re-ingesting the same xlsx duplicates login/video/mcq
+ *                        rows. Each export should contain only new data.
+ *  - 'replace':          TRUNCATE users / login_history / video_usage / mcq_report,
+ *                        then INSERT everything fresh from the batch. Use when
+ *                        re-bootstrapping the DB from a single full export.
  */
-export async function loadBatch(batch: IngestBatch, mode: IngestMode = "replace"): Promise<LoadResult> {
+export async function loadBatch(batch: IngestBatch, mode: IngestMode = "append"): Promise<LoadResult> {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
-
-    if (batch.users.length > 0) {
-      await upsertUsers(conn, batch);
-    }
 
     if (mode === "replace") {
       await conn.query("SET FOREIGN_KEY_CHECKS = 0");
       await conn.query("TRUNCATE TABLE login_history");
       await conn.query("TRUNCATE TABLE video_usage");
       await conn.query("TRUNCATE TABLE mcq_report");
+      await conn.query("TRUNCATE TABLE users");
       await conn.query("SET FOREIGN_KEY_CHECKS = 1");
+    }
+
+    if (batch.users.length > 0) {
+      await upsertUsers(conn, batch);
     }
 
     if (batch.logins.length > 0) await insertLogins(conn, batch);

@@ -17,6 +17,7 @@ DROP TABLE IF EXISTS login_history;
 DROP TABLE IF EXISTS users;
 
 CREATE TABLE users (
+  id             BIGINT       NOT NULL AUTO_INCREMENT UNIQUE,
   user_id        INT          NOT NULL PRIMARY KEY,
   enrollment_id  VARCHAR(64)  NULL,
   student_name   VARCHAR(255) NULL,

@@ -26,6 +26,14 @@ export function readExcel(filePath: string): IngestBatch {
   const videoSheet = find("Video Usage");
   const mcqSheet = find("MCQ Report");
 
+  // The e-class admin writes each data sheet as an Excel Table with a stale
+  // `dimension` tag (becomes !ref in SheetJS). For Login History it's A1:M1 —
+  // header only — even though 1000+ data rows are present. Recompute !ref from
+  // the actual cell footprint so sheet_to_json sees every row.
+  for (const name of [loginSheet, videoSheet, mcqSheet]) {
+    if (name) refreshSheetRef(wb.Sheets[name]);
+  }
+
   const userMap = new Map<number, RawUser>();
   const upsertUser = (raw: Record<string, unknown>): number | null => {
     const userId = toInt(raw["UserID"], 0);
@@ -121,6 +129,26 @@ export function readExcel(filePath: string): IngestBatch {
     videos,
     mcq,
   };
+}
+
+function refreshSheetRef(sheet: xlsx.WorkSheet): void {
+  let maxR = 0;
+  let maxC = 0;
+  for (const k of Object.keys(sheet)) {
+    if (k.startsWith("!")) continue;
+    const m = /^([A-Z]+)(\d+)$/.exec(k);
+    if (!m) continue;
+    const row = Number(m[2]);
+    let col = 0;
+    for (const ch of m[1]) col = col * 26 + (ch.charCodeAt(0) - 64);
+    if (row > maxR) maxR = row;
+    if (col > maxC) maxC = col;
+  }
+  if (maxR === 0) return;
+  sheet["!ref"] = xlsx.utils.encode_range({
+    s: { r: 0, c: 0 },
+    e: { r: maxR - 1, c: maxC - 1 },
+  });
 }
 
 function parseUserKind(v: unknown): "Student" | "Teacher" | null {

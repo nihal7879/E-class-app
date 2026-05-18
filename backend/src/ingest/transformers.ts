@@ -62,11 +62,23 @@ export function parseDate(v: unknown): string | null {
 /**
  * Validates "H:MM:SS" / "HH:MM:SS" / "H:MM" and returns the canonical "HH:MM:SS" string
  * that MySQL TIME columns accept directly. Works for both wall-clock and durations.
+ *
+ * Also accepts numeric input as milliseconds since midnight (LoginHistory_VideoUsage.json
+ * encodes LoginTime/LogoutTime/SessionTime this way — e.g. 40808000 → "11:20:08").
+ *
  * Returns null for blank or unparseable input — caller decides whether to skip the row.
  */
 export function normalizeTime(v: unknown): string | null {
+  if (typeof v === "number" && Number.isFinite(v) && v >= 0) {
+    return msToHms(v);
+  }
   const s = nullIfEmpty(v);
   if (!s) return null;
+
+  // pure-number string ("40808000") → treat as ms since midnight
+  if (/^\d+$/.test(s)) {
+    return msToHms(Number(s));
+  }
 
   const m = /^(\d+):(\d{1,2}):(\d{1,2})(?:\.\d+)?$/.exec(s);
   if (m) {
@@ -86,6 +98,15 @@ export function normalizeTime(v: unknown): string | null {
   }
 
   return null;
+}
+
+function msToHms(ms: number): string {
+  let total = Math.floor(ms / 1000);
+  const se = total % 60;
+  total = Math.floor(total / 60);
+  const mi = total % 60;
+  const h = Math.floor(total / 60);
+  return `${pad(h)}:${pad(mi)}:${pad(se)}`;
 }
 
 function pad(n: number): string {
