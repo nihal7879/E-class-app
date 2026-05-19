@@ -1,6 +1,12 @@
+import { useMemo } from "react";
 import { useCatalogue } from "@/lib/hooks";
 import { useFilter } from "@/lib/filterContext";
-import { MONTH_LABELS, shortSchoolName } from "@/lib/parse";
+import {
+  MONTH_LABELS,
+  formatCourseLabel,
+  shortSchoolName,
+  sortCourses,
+} from "@/lib/parse";
 import MultiSelect from "./MultiSelect";
 import SingleSelect from "./SingleSelect";
 
@@ -20,6 +26,9 @@ export default function FilterBar() {
     { value: "all" as const, label: "All months" },
     ...cat.months.map((m) => ({ value: m, label: MONTH_LABELS[m - 1] })),
   ];
+
+  // Courses come from the catalogue in arbitrary order; render them as 1st → 10th.
+  const courseOptions = useMemo(() => sortCourses(cat.courses), [cat.courses]);
 
   return (
     <div className="card p-4">
@@ -61,10 +70,11 @@ export default function FilterBar() {
         />
         <MultiSelect
           label="Course"
-          options={cat.courses}
+          options={courseOptions}
           value={filter.courses}
           onChange={(next) => setFilter((f) => ({ ...f, courses: next }))}
           placeholder={cat.courses.length === 0 ? "No courses in data" : "All courses"}
+          formatOption={formatCourseLabel}
         />
         <div>
           <label className="mb-1 block text-xs font-medium text-slate-600">

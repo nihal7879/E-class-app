@@ -8,8 +8,10 @@ import {
   formatNumber,
   schoolFromId,
   schoolId as toSchoolId,
+  sortCourses,
 } from "@/lib/parse";
 import SectionHeader from "@/components/ui/SectionHeader";
+import { CardGridSkeleton } from "@/components/ui/Skeleton";
 
 interface SchoolCourseStat {
   course: string;
@@ -34,19 +36,22 @@ export default function SchoolCoursesPage() {
     );
   }, [school, setFilter]);
 
-  const { data } = useSchoolCourses(school);
-  const courses: SchoolCourseStat[] = useMemo(
-    () =>
-      (data?.items ?? []).map((c) => ({
-        course: c.course,
-        students: c.uniqueStudents,
-        subjects: c.subjects,
-        videoViews: c.videoViews,
-        videoDurationMs: c.videoWatchMs,
-        mcqAttempts: c.mcqAttempts,
-      })),
-    [data],
-  );
+  const { data, loading } = useSchoolCourses(school);
+  const courses: SchoolCourseStat[] = useMemo(() => {
+    const items = (data?.items ?? []).map((c) => ({
+      course: c.course,
+      students: c.uniqueStudents,
+      subjects: c.subjects,
+      videoViews: c.videoViews,
+      videoDurationMs: c.videoWatchMs,
+      mcqAttempts: c.mcqAttempts,
+    }));
+    // Render 1st → 10th, then anything without an ordinal alphabetically.
+    const order = new Map(
+      sortCourses(items.map((c) => c.course)).map((c, i) => [c, i]),
+    );
+    return items.sort((a, b) => (order.get(a.course)! - order.get(b.course)!));
+  }, [data]);
 
   const backHref = school ? `/school/${toSchoolId(school)}` : "/dashboard";
 
@@ -83,7 +88,9 @@ export default function SchoolCoursesPage() {
           title="Course list"
           description="Activity scoped to the current filter selections."
         />
-        {courses.length === 0 ? (
+        {loading && !data ? (
+          <CardGridSkeleton count={6} columns={3} />
+        ) : courses.length === 0 ? (
           <div className="card flex items-center justify-center p-10 text-[13px] text-slate-500">
             No courses for this school under the current filters.
           </div>

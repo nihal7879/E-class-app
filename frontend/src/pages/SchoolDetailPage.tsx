@@ -9,6 +9,7 @@ import DailyActivityChart from "@/components/charts/DailyActivityChart";
 import StudentBreakdownChart from "@/components/charts/StudentBreakdownChart";
 import StudentList from "@/components/charts/StudentList";
 import SectionHeader from "@/components/ui/SectionHeader";
+import { KpiStripSkeleton } from "@/components/ui/Skeleton";
 
 export default function SchoolDetailPage() {
   const { schoolId: id } = useParams<{ schoolId: string }>();
@@ -57,6 +58,11 @@ export default function SchoolDetailPage() {
     [dailyApi.data],
   );
   const courseCount = coursesApi.data?.items.length ?? 0;
+  const studentsLoading = studentsApi.loading && !studentsApi.data;
+  const dailyLoading = dailyApi.loading && !dailyApi.data;
+  const kpisLoading =
+    (studentsApi.loading && !studentsApi.data) ||
+    (coursesApi.loading && !coursesApi.data);
 
   const sortedDesc = useMemo(
     () => [...students].sort((a, b) => b.totalSessionMs - a.totalSessionMs),
@@ -94,6 +100,9 @@ export default function SchoolDetailPage() {
         </div>
       </div>
 
+      {kpisLoading ? (
+        <KpiStripSkeleton />
+      ) : (
       <section className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
         <KpiTile
           tone="indigo"
@@ -139,13 +148,14 @@ export default function SchoolDetailPage() {
           icon={<ClockIcon />}
         />
       </section>
+      )}
 
       <div>
         <SectionHeader
           title="Daily activity"
           description="Logins and active students per day for this school."
         />
-        <DailyActivityChart data={daily} />
+        <DailyActivityChart data={daily} loading={dailyLoading} />
       </div>
 
       <div>
@@ -153,7 +163,7 @@ export default function SchoolDetailPage() {
           title="Per-student breakdown"
           description="Sessions and usage time by Enrollment ID."
         />
-        <StudentBreakdownChart students={students} />
+        <StudentBreakdownChart students={students} loading={studentsLoading} />
       </div>
 
       <div>
@@ -167,6 +177,7 @@ export default function SchoolDetailPage() {
             subtitle="Highest total time logged in"
             students={topStudents}
             tone="emerald"
+            loading={studentsLoading}
           />
           <StudentList
             title="Low usage students"
@@ -174,6 +185,7 @@ export default function SchoolDetailPage() {
             students={lowStudents}
             tone="rose"
             emptyText="No students with non-zero usage to rank"
+            loading={studentsLoading}
           />
         </div>
       </div>

@@ -27,11 +27,13 @@ import {
   formatCourseLabel,
   formatHours,
   formatNumber,
+  naturalCompare,
   schoolFromId,
   schoolId as toSchoolId,
   subjectFromId,
 } from "@/lib/parse";
 import SectionHeader from "@/components/ui/SectionHeader";
+import { KpiStripSkeleton, TableSkeleton } from "@/components/ui/Skeleton";
 
 type StudentSortKey =
   | "studentName"
@@ -69,9 +71,17 @@ export default function SubjectDetailPage() {
     );
   }, [school, setFilter]);
 
-  // Pin school directly so the data is scoped before the filter-sync effect
-  // has a chance to run — avoids the race that produced wrong/empty results.
-  const extra = useMemo(() => ({ schools: school ? [school] : [] }), [school]);
+  // Pin BOTH school and course directly. Subject names ("My English Book",
+  // "Mathematics", …) are reused across standards in the source data — without
+  // the course filter, the chapter list would bleed in chapters from every
+  // standard that happens to share the subject name.
+  const extra = useMemo(
+    () => ({
+      schools: school ? [school] : [],
+      courses: course ? [course] : [],
+    }),
+    [school, course],
+  );
   const detailApi = useSubjectDetail(subject || undefined, extra);
   const studentsApi = useSubjectStudents(subject || undefined, extra);
 
@@ -80,7 +90,7 @@ export default function SubjectDetailPage() {
     if (!d) return null;
     const chapters: SubjectChapterStat[] = d.chapterBreakdown.map((c) => ({
       chapter: c.chapter,
-      students: 0,
+      students: c.students,
       contentItems: c.contents,
       videoViews: c.videoViews,
       videoDurationMs: c.videoWatchMs,
@@ -133,7 +143,26 @@ export default function SubjectDetailPage() {
         </div>
       </div>
 
-      {!detail ||
+      {(detailApi.loading && !detailApi.data) ||
+      (studentsApi.loading && !studentsApi.data) ? (
+        <>
+          <KpiStripSkeleton count={5} />
+          <div>
+            <SectionHeader
+              title="Chapters"
+              description="Activity grouped by chapter within this subject."
+            />
+            <TableSkeleton rows={6} columns={6} />
+          </div>
+          <div>
+            <SectionHeader
+              title="Students"
+              description="Per-student activity on this subject."
+            />
+            <TableSkeleton rows={8} columns={6} withSearch />
+          </div>
+        </>
+      ) : !detail ||
       (detail.totalStudents === 0 && detail.totalChapters === 0) ? (
         <div className="card flex items-center justify-center p-10 text-[13px] text-slate-500">
           No activity for this subject under the current filters.
@@ -229,8 +258,9 @@ function StatTile({
 // ---------- Chapter table ----------
 
 function ChapterTable({ chapters }: { chapters: SubjectChapterStat[] }) {
-  const [sortKey, setSortKey] = useState<ChapterSortKey>("videoDurationMs");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  // Default order: "1. …", "2. …", "3. …" — natural by chapter title.
+  const [sortKey, setSortKey] = useState<ChapterSortKey>("chapter");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const sorted = useMemo(() => {
     const arr = [...chapters];
@@ -238,7 +268,8 @@ function ChapterTable({ chapters }: { chapters: SubjectChapterStat[] }) {
       const av = a[sortKey];
       const bv = b[sortKey];
       let cmp: number;
-      if (typeof av === "number" && typeof bv === "number") cmp = av - bv;
+      if (sortKey === "chapter") cmp = naturalCompare(String(av), String(bv));
+      else if (typeof av === "number" && typeof bv === "number") cmp = av - bv;
       else cmp = String(av).localeCompare(String(bv));
       return sortDir === "asc" ? cmp : -cmp;
     });

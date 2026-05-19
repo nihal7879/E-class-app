@@ -85,6 +85,34 @@ export function sortAlpha(arr: string[]): string[] {
   return [...arr].sort((a, b) => a.localeCompare(b));
 }
 
+// Natural ("human") string compare. "3.1 Traffic Signals" < "3.2 Vehicles" < "3.10 Foo" < "23. Molai's Kathoni".
+// Plain localeCompare would put "10" before "2" because it compares char-by-char.
+export function naturalCompare(a: string, b: string): number {
+  const tokens = (s: string): (number | string)[] => {
+    const out: (number | string)[] = [];
+    s.replace(/(\d+)|(\D+)/g, (_m, num: string | undefined, txt: string | undefined) => {
+      if (num !== undefined) out.push(Number(num));
+      else if (txt !== undefined) out.push(txt.toLowerCase());
+      return "";
+    });
+    return out;
+  };
+  const ax = tokens(a);
+  const bx = tokens(b);
+  const len = Math.min(ax.length, bx.length);
+  for (let i = 0; i < len; i++) {
+    const av = ax[i];
+    const bv = bx[i];
+    if (typeof av === "number" && typeof bv === "number") {
+      if (av !== bv) return av - bv;
+    } else {
+      const cmp = String(av).localeCompare(String(bv));
+      if (cmp !== 0) return cmp;
+    }
+  }
+  return ax.length - bx.length;
+}
+
 // Order: 1st, 2nd, 3rd, ... 10th, then anything without an ordinal alphabetically.
 export function sortCourses(arr: string[]): string[] {
   const ord = (s: string): number => {

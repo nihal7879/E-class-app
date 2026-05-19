@@ -12,16 +12,18 @@ import { formatHours, formatNumber } from "@/lib/parse";
 import type { StudentStat } from "@/lib/types";
 import ChartCard from "./ChartCard";
 import { CustomTooltip } from "./Tooltip";
+import { BarChartSkeleton } from "@/components/ui/Skeleton";
 import { AXIS_COLOR, AXIS_TICK_STYLE, GRID_COLOR, GRID_DASH } from "./theme";
 
 interface Props {
   students: StudentStat[];
+  loading?: boolean;
 }
 
 const SESSIONS_COLOR = "#4f46e5";
 const HOURS_COLOR = "#059669";
 
-export default function StudentBreakdownChart({ students }: Props) {
+export default function StudentBreakdownChart({ students, loading = false }: Props) {
   const data = students.map((s) => ({
     enrollmentId: s.enrollmentId,
     sessions: s.sessions,
@@ -34,7 +36,9 @@ export default function StudentBreakdownChart({ students }: Props) {
       title="Student Session Count & Duration"
       subtitle="Per-student sessions and total time logged in, by Enrollment ID"
     >
-      {data.length === 0 ? (
+      {loading && data.length === 0 ? (
+        <BarChartSkeleton height={360} bars={14} />
+      ) : data.length === 0 ? (
         <Empty />
       ) : (
         <div className="h-[360px]">

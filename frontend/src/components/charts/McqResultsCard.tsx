@@ -19,6 +19,7 @@ import {
   sortCourses,
 } from "@/lib/parse";
 import ChartCard from "./ChartCard";
+import { ChartCardBodySkeleton } from "@/components/ui/Skeleton";
 import { CustomTooltip } from "./Tooltip";
 import { AXIS_COLOR, AXIS_TICK_STYLE, GRID_COLOR, GRID_DASH } from "./theme";
 
@@ -112,7 +113,7 @@ export default function McqResultsCard() {
           Could not load MCQ results: {error}
         </div>
       ) : loading && !data ? (
-        <div className="flex h-[200px] items-center justify-center text-sm text-slate-400">Loading…</div>
+        <ChartCardBodySkeleton height={220} withStats rows={5} />
       ) : !hasData ? (
         <Empty />
       ) : (

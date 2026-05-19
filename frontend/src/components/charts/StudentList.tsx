@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import type { StudentStat } from "@/lib/types";
 import { formatHours, formatNumber } from "@/lib/parse";
+import { Skeleton } from "@/components/ui/Skeleton";
 import ChartCard from "./ChartCard";
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
   students: StudentStat[];
   tone: "emerald" | "rose";
   emptyText?: string;
+  loading?: boolean;
 }
 
 export default function StudentList({
@@ -17,6 +19,7 @@ export default function StudentList({
   students,
   tone,
   emptyText = "No students for current filter",
+  loading = false,
 }: Props) {
   const badgeBg =
     tone === "emerald"
@@ -28,7 +31,22 @@ export default function StudentList({
 
   return (
     <ChartCard title={title} subtitle={subtitle}>
-      {students.length === 0 ? (
+      {loading && students.length === 0 ? (
+        <ol className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <li key={i} className="flex items-center gap-3 px-2 py-2">
+              <Skeleton className="h-9 w-9" rounded="full" />
+              <div className="flex-1 space-y-2">
+                <div className="flex justify-between gap-3">
+                  <Skeleton className="h-3.5 w-32" />
+                  <Skeleton className="h-3.5 w-12" />
+                </div>
+                <Skeleton className="h-1.5 w-full" rounded="full" />
+              </div>
+            </li>
+          ))}
+        </ol>
+      ) : students.length === 0 ? (
         <div className="flex h-40 items-center justify-center text-sm text-slate-400">
           {emptyText}
         </div>

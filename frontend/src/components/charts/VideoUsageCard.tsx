@@ -10,6 +10,7 @@ import {
   sortCourses,
 } from "@/lib/parse";
 import ChartCard from "./ChartCard";
+import { ChartCardBodySkeleton } from "@/components/ui/Skeleton";
 import { CHART_PALETTE } from "./theme";
 
 const TOP_N_DEFAULT = 6;
@@ -98,7 +99,7 @@ export default function VideoUsageCard() {
           Could not load video usage: {error}
         </div>
       ) : loading && !data ? (
-        <div className="flex h-[200px] items-center justify-center text-sm text-slate-400">Loading…</div>
+        <ChartCardBodySkeleton height={220} withStats rows={5} />
       ) : !hasData ? (
         <Empty />
       ) : (

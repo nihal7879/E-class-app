@@ -1,5 +1,6 @@
 import { useKpis } from "@/lib/hooks";
 import { formatHours, formatNumber } from "@/lib/parse";
+import { KpiStripSkeleton } from "@/components/ui/Skeleton";
 import KpiTile from "./KpiTile";
 
 export default function KpiStrip() {
@@ -13,16 +14,19 @@ export default function KpiStrip() {
     );
   }
 
+  if (loading && !data) {
+    return <KpiStripSkeleton />;
+  }
+
   const k = data ?? {
     totalLogins: 0, totalSessionMs: 0, avgSessionMs: 0, uniqueUsers: 0,
     videoViews: 0, videoWatchMs: 0, mcqAttempts: 0, avgPercentage: 0,
     totalSchools: 0, totalCourses: 0,
   };
   const hours = k.videoWatchMs / 3_600_000;
-  const opacity = loading && !data ? "opacity-60" : "";
 
   return (
-    <section className={`grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5 ${opacity}`}>
+    <section className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
       <KpiTile
         tone="indigo"
         label="Schools"

@@ -7,11 +7,13 @@ import {
   courseId as toCourseId,
   formatCourseLabel,
   formatNumber,
+  naturalCompare,
   schoolFromId,
   schoolId as toSchoolId,
   subjectId as toSubjectId,
 } from "@/lib/parse";
 import SectionHeader from "@/components/ui/SectionHeader";
+import { CardGridSkeleton } from "@/components/ui/Skeleton";
 
 export default function CourseSubjectsPage() {
   const { schoolId: sId, courseId: cId } = useParams<{
@@ -34,18 +36,21 @@ export default function CourseSubjectsPage() {
   // Pin the school via explicit override so we don't depend on the filter-sync
   // effect (which used to cause a race-induced double fetch on navigation).
   const extra = useMemo(() => ({ schools: school ? [school] : [] }), [school]);
-  const { data } = useCourseSubjects(school && course ? course : undefined, extra);
+  const { data, loading } = useCourseSubjects(school && course ? course : undefined, extra);
   const subjects = useMemo(
     () =>
-      (data?.items ?? []).map((s) => ({
-        subject: s.subject,
-        students: s.students,
-        chapters: s.chapters,
-        videoViews: s.videoViews,
-        videoDurationMs: s.videoWatchMs,
-        mcqAttempts: s.mcqAttempts,
-        avgMcqPercentage: s.avgPercentage,
-      })),
+      (data?.items ?? [])
+        .map((s) => ({
+          subject: s.subject,
+          students: s.students,
+          chapters: s.chapters,
+          videoViews: s.videoViews,
+          videoDurationMs: s.videoWatchMs,
+          mcqAttempts: s.mcqAttempts,
+          avgMcqPercentage: s.avgPercentage,
+        }))
+        // Order subject cards naturally — "1. …", "2. …", "10. …".
+        .sort((a, b) => naturalCompare(a.subject, b.subject)),
     [data],
   );
 
@@ -84,7 +89,9 @@ export default function CourseSubjectsPage() {
           title="Subjects"
           description="Activity scoped to the current filter selections."
         />
-        {subjects.length === 0 ? (
+        {loading && !data ? (
+          <CardGridSkeleton count={6} columns={3} />
+        ) : subjects.length === 0 ? (
           <div className="card flex items-center justify-center p-10 text-[13px] text-slate-500">
             No subjects for this course under the current filters.
           </div>

@@ -22,6 +22,7 @@ import {
   formatCourseLabel,
   schoolId,
   shortSchoolName,
+  sortCourses,
 } from "@/lib/parse";
 import { useIsSm } from "@/lib/useMediaQuery";
 import MultiSelect from "./MultiSelect";
@@ -53,6 +54,12 @@ export default function FilterButton() {
     filter.schools.length +
     filter.courses.length +
     (filter.dateFrom || filter.dateTo ? 1 : 0);
+
+  // Courses come from the catalogue in arbitrary order; render them 1st → 10th.
+  const courseOptions = useMemo(
+    () => sortCourses(available.courses),
+    [available.courses],
+  );
 
   useLayoutEffect(() => {
     if (!open || !buttonRef.current) return;
@@ -209,7 +216,7 @@ export default function FilterButton() {
                   <div className="sm:col-span-2">
                     <MultiSelect
                       label="Course"
-                      options={available.courses}
+                      options={courseOptions}
                       value={filter.courses}
                       onChange={(next) =>
                         setFilter((f) => ({ ...f, courses: next }))

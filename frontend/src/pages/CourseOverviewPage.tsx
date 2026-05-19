@@ -6,9 +6,15 @@ import {
   formatCourseLabel,
   formatHours,
   formatNumber,
+  naturalCompare,
   schoolId as toSchoolId,
 } from "@/lib/parse";
 import SectionHeader from "@/components/ui/SectionHeader";
+import {
+  KpiStripSkeleton,
+  PageHeroSkeleton,
+  TableSkeleton,
+} from "@/components/ui/Skeleton";
 
 interface CourseOverviewSubject {
   subject: string;
@@ -101,10 +107,33 @@ export default function CourseOverviewPage() {
     [schoolsApi.data],
   );
 
+  if (detailApi.error) {
+    return (
+      <div className="card flex items-center justify-center p-10 text-[13px] text-rose-600">
+        Error: {detailApi.error}
+      </div>
+    );
+  }
+
   if (!course || !data) {
     return (
-      <div className="card flex items-center justify-center p-10 text-[13px] text-slate-500">
-        {detailApi.error ? `Error: ${detailApi.error}` : "Loading…"}
+      <div className="space-y-6 pb-12">
+        <PageHeroSkeleton />
+        <KpiStripSkeleton count={6} />
+        <div>
+          <SectionHeader
+            title="Subjects in this standard"
+            description="Across all schools — sorted by combined video + MCQ activity."
+          />
+          <TableSkeleton rows={6} columns={7} withSearch />
+        </div>
+        <div>
+          <SectionHeader
+            title="Schools using this standard"
+            description="Where this standard is being consumed — click a school to drill into its students."
+          />
+          <TableSkeleton rows={5} columns={7} />
+        </div>
       </div>
     );
   }
@@ -208,8 +237,9 @@ function SubjectTable({
 }: {
   subjects: CourseOverviewSubject[];
 }) {
-  const [sortKey, setSortKey] = useState<SubjectSortKey>("videoDurationMs");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  // Default order: natural by subject name (1, 2, … 10, then non-numeric).
+  const [sortKey, setSortKey] = useState<SubjectSortKey>("subject");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
@@ -224,7 +254,8 @@ function SubjectTable({
       const av = a[sortKey];
       const bv = b[sortKey];
       let cmp: number;
-      if (typeof av === "number" && typeof bv === "number") cmp = av - bv;
+      if (sortKey === "subject") cmp = naturalCompare(String(av), String(bv));
+      else if (typeof av === "number" && typeof bv === "number") cmp = av - bv;
       else cmp = String(av).localeCompare(String(bv));
       return sortDir === "asc" ? cmp : -cmp;
     });

@@ -37,7 +37,8 @@ router.get(
       `SELECT vu.chapter AS chapter,
               COALESCE(SUM(vu.total_view_count), 0)                        AS videoViews,
               COALESCE(SUM(TIME_TO_SEC(vu.total_view_duration)), 0) * 1000 AS videoWatchMs,
-              COUNT(DISTINCT vu.content_name)                              AS contents
+              COUNT(DISTINCT vu.content_name)                              AS contents,
+              COUNT(DISTINCT vu.user_id)                                   AS students
        FROM video_usage vu
        JOIN users u ON u.user_id = vu.user_id
        ${video.where ? video.where + " AND " : " WHERE "}vu.subject = ?
@@ -75,6 +76,7 @@ router.get(
         videoViews: Number(r.videoViews),
         videoWatchMs: Number(r.videoWatchMs),
         contents: Number(r.contents),
+        students: Number(r.students ?? 0),
       })),
     });
   }),

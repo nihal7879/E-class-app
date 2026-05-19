@@ -3,6 +3,7 @@ import clsx from "clsx";
 import { useSchoolsComposition } from "@/lib/hooks";
 import { formatNumber } from "@/lib/parse";
 import type { SchoolCompositionItem } from "@/lib/apiTypes";
+import { ChartCardBodySkeleton } from "@/components/ui/Skeleton";
 import ChartCard from "./ChartCard";
 
 type SchoolCompositionStat = SchoolCompositionItem;
@@ -162,9 +163,7 @@ export default function SchoolCompositionChart({ onSchoolClick }: Props) {
           Could not load school activity: {error}
         </div>
       ) : loading && stats.length === 0 ? (
-        <div className="flex h-[280px] items-center justify-center text-sm text-slate-400">
-          Loading…
-        </div>
+        <ChartCardBodySkeleton height={280} rows={6} />
       ) : stats.length === 0 ? (
         <EmptyState />
       ) : (

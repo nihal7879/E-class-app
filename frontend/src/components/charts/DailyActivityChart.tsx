@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import ChartCard from "./ChartCard";
 import { CustomTooltip } from "./Tooltip";
+import { AreaChartSkeleton } from "@/components/ui/Skeleton";
 import { AXIS_COLOR, AXIS_TICK_STYLE, GRID_COLOR, GRID_DASH } from "./theme";
 
 interface DailyPoint {
@@ -19,15 +20,18 @@ interface DailyPoint {
 }
 interface Props {
   data: DailyPoint[];
+  loading?: boolean;
 }
 
-export default function DailyActivityChart({ data }: Props) {
+export default function DailyActivityChart({ data, loading = false }: Props) {
   return (
     <ChartCard
       title="Daily Activity Trend"
       subtitle="Logins and unique active students by day"
     >
-      {data.length === 0 ? (
+      {loading && data.length === 0 ? (
+        <AreaChartSkeleton height={260} />
+      ) : data.length === 0 ? (
         <div className="flex h-[260px] items-center justify-center text-sm text-slate-400">
           No daily activity for current filter
         </div>
