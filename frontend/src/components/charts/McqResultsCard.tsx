@@ -20,6 +20,7 @@ import {
 } from "@/lib/parse";
 import ChartCard from "./ChartCard";
 import { ChartCardBodySkeleton } from "@/components/ui/Skeleton";
+import ErrorState from "@/components/ui/ErrorState";
 import { CustomTooltip } from "./Tooltip";
 import { AXIS_COLOR, AXIS_TICK_STYLE, GRID_COLOR, GRID_DASH } from "./theme";
 
@@ -56,7 +57,7 @@ function formatTime(ms: number): string {
 
 export default function McqResultsCard() {
   const navigate = useNavigate();
-  const { data, loading, error } = useMcqOverview();
+  const { data, loading, error, refetch } = useMcqOverview();
   const overview = data ?? EMPTY_OVERVIEW;
   const [showAll, setShowAll] = useState(false);
 
@@ -109,9 +110,12 @@ export default function McqResultsCard() {
       }
     >
       {error ? (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          Could not load MCQ results: {error}
-        </div>
+        <ErrorState
+          title="MCQ results"
+          error={error}
+          onRetry={refetch}
+          height={220}
+        />
       ) : loading && !data ? (
         <ChartCardBodySkeleton height={220} withStats rows={5} />
       ) : !hasData ? (

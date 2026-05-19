@@ -106,3 +106,11 @@ export default function DailyActivityChart({ data, loading = false }: Props) {
     </ChartCard>
   );
 }
+
+
+
+
+
+
+
+

@@ -4,6 +4,7 @@ import { useSchoolsComposition } from "@/lib/hooks";
 import { formatNumber } from "@/lib/parse";
 import type { SchoolCompositionItem } from "@/lib/apiTypes";
 import { ChartCardBodySkeleton } from "@/components/ui/Skeleton";
+import ErrorState from "@/components/ui/ErrorState";
 import ChartCard from "./ChartCard";
 
 type SchoolCompositionStat = SchoolCompositionItem;
@@ -60,7 +61,7 @@ interface Props {
 }
 
 export default function SchoolCompositionChart({ onSchoolClick }: Props) {
-  const { data, loading, error } = useSchoolsComposition();
+  const { data, loading, error, refetch } = useSchoolsComposition();
   const stats: SchoolCompositionStat[] = data?.items ?? [];
   const [showAll, setShowAll] = useState(false);
   const [view, setView] = useState<ViewMetric>("all");
@@ -159,9 +160,12 @@ export default function SchoolCompositionChart({ onSchoolClick }: Props) {
       }
     >
       {error ? (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          Could not load school activity: {error}
-        </div>
+        <ErrorState
+          title="school activity"
+          error={error}
+          onRetry={refetch}
+          height={280}
+        />
       ) : loading && stats.length === 0 ? (
         <ChartCardBodySkeleton height={280} rows={6} />
       ) : stats.length === 0 ? (

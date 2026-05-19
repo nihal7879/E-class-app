@@ -1,17 +1,14 @@
 import { useKpis } from "@/lib/hooks";
 import { formatHours, formatNumber } from "@/lib/parse";
 import { KpiStripSkeleton } from "@/components/ui/Skeleton";
+import ErrorState from "@/components/ui/ErrorState";
 import KpiTile from "./KpiTile";
 
 export default function KpiStrip() {
-  const { data, loading, error } = useKpis();
+  const { data, loading, error, refetch } = useKpis();
 
   if (error) {
-    return (
-      <section className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-        Could not load KPIs: {error}
-      </section>
-    );
+    return <ErrorState title="KPIs" error={error} onRetry={refetch} />;
   }
 
   if (loading && !data) {

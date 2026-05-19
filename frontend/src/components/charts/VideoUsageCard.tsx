@@ -11,6 +11,7 @@ import {
 } from "@/lib/parse";
 import ChartCard from "./ChartCard";
 import { ChartCardBodySkeleton } from "@/components/ui/Skeleton";
+import ErrorState from "@/components/ui/ErrorState";
 import { CHART_PALETTE } from "./theme";
 
 const TOP_N_DEFAULT = 6;
@@ -28,7 +29,7 @@ const EMPTY_OVERVIEW: VideoOverviewResponse = {
 
 export default function VideoUsageCard() {
   const navigate = useNavigate();
-  const { data, loading, error } = useVideoOverview();
+  const { data, loading, error, refetch } = useVideoOverview();
   const overview = data ?? EMPTY_OVERVIEW;
   const [showAll, setShowAll] = useState(false);
 
@@ -95,9 +96,12 @@ export default function VideoUsageCard() {
       }
     >
       {error ? (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          Could not load video usage: {error}
-        </div>
+        <ErrorState
+          title="video usage"
+          error={error}
+          onRetry={refetch}
+          height={220}
+        />
       ) : loading && !data ? (
         <ChartCardBodySkeleton height={220} withStats rows={5} />
       ) : !hasData ? (

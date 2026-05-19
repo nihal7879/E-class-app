@@ -15,6 +15,7 @@ import {
   PageHeroSkeleton,
   TableSkeleton,
 } from "@/components/ui/Skeleton";
+import ErrorState from "@/components/ui/ErrorState";
 
 interface CourseOverviewSubject {
   subject: string;
@@ -109,9 +110,11 @@ export default function CourseOverviewPage() {
 
   if (detailApi.error) {
     return (
-      <div className="card flex items-center justify-center p-10 text-[13px] text-rose-600">
-        Error: {detailApi.error}
-      </div>
+      <ErrorState
+        title="course details"
+        error={detailApi.error}
+        onRetry={detailApi.refetch}
+      />
     );
   }
 
