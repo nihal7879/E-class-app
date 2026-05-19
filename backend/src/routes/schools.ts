@@ -22,9 +22,10 @@ router.get(
     });
     const [loginRows] = await pool.query<any[]>(
       `SELECT u.school AS school,
-              COUNT(*)                                              AS sessions,
-              COUNT(DISTINCT lh.user_id)                            AS uniqueStudents,
-              COALESCE(SUM(TIME_TO_SEC(lh.session_time)), 0) * 1000 AS totalSessionMs
+              COUNT(*)                                                            AS logins,
+              SUM(CASE WHEN TIME_TO_SEC(lh.session_time) >= 60 THEN 1 ELSE 0 END) AS sessions,
+              COUNT(DISTINCT lh.user_id)                                          AS uniqueStudents,
+              COALESCE(SUM(TIME_TO_SEC(lh.session_time)), 0) * 1000               AS totalSessionMs
        FROM login_history lh
        JOIN users u ON u.user_id = lh.user_id
        ${login.where}
@@ -91,8 +92,8 @@ router.get(
     };
     for (const r of loginRows) {
       const x = get(r.school);
-      x.sessions = Number(r.sessions);
-      x.logins = Number(r.sessions);
+      x.sessions = Number(r.sessions);          // active (>= 1 min)
+      x.logins   = Number(r.logins);            // raw login_history rows
       x.uniqueStudents = Number(r.uniqueStudents);
       x.totalSessionMs = Number(r.totalSessionMs);
     }
@@ -131,10 +132,12 @@ router.get(
       genderColumn: "u.gender",
     });
     const [loginRows] = await pool.query<any[]>(
-      `SELECT COUNT(*)                                              AS totalLogins,
-              COALESCE(SUM(TIME_TO_SEC(lh.session_time)), 0) * 1000 AS totalSessionMs,
-              COALESCE(AVG(TIME_TO_SEC(lh.session_time)), 0) * 1000 AS avgSessionMs,
-              COUNT(DISTINCT lh.user_id)                            AS uniqueUsers
+      `SELECT COUNT(*)                                                            AS totalLogins,
+              SUM(CASE WHEN TIME_TO_SEC(lh.session_time) >= 60 THEN 1 ELSE 0 END) AS activeSessions,
+              COALESCE(SUM(TIME_TO_SEC(lh.session_time)), 0) * 1000               AS totalSessionMs,
+              COALESCE(AVG(CASE WHEN TIME_TO_SEC(lh.session_time) >= 60
+                                THEN TIME_TO_SEC(lh.session_time) END), 0) * 1000 AS avgSessionMs,
+              COUNT(DISTINCT lh.user_id)                                          AS uniqueUsers
        FROM login_history lh
        JOIN users u ON u.user_id = lh.user_id
        ${login.where}`,
@@ -177,6 +180,7 @@ router.get(
     res.json({
       school,
       totalLogins:    Number(loginRows[0]?.totalLogins ?? 0),
+      activeSessions: Number(loginRows[0]?.activeSessions ?? 0),
       totalSessionMs: Number(loginRows[0]?.totalSessionMs ?? 0),
       avgSessionMs:   Number(loginRows[0]?.avgSessionMs ?? 0),
       uniqueUsers:    Number(loginRows[0]?.uniqueUsers ?? 0),

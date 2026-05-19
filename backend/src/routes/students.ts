@@ -34,8 +34,9 @@ router.get(
     });
     const [loginRows] = await pool.query<any[]>(
       `SELECT lh.user_id AS userId,
-              COUNT(*)                                              AS logins,
-              COALESCE(SUM(TIME_TO_SEC(lh.session_time)), 0) * 1000 AS totalSessionMs
+              COUNT(*)                                                            AS logins,
+              SUM(CASE WHEN TIME_TO_SEC(lh.session_time) >= 60 THEN 1 ELSE 0 END) AS activeSessions,
+              COALESCE(SUM(TIME_TO_SEC(lh.session_time)), 0) * 1000               AS totalSessionMs
        FROM login_history lh
        JOIN users u ON u.user_id = lh.user_id
        ${login.where}
@@ -86,6 +87,7 @@ router.get(
       school: string | null;
       division: string | null;
       logins: number;
+      activeSessions: number;
       totalSessionMs: number;
       videoViews: number;
       videoWatchMs: number;
@@ -115,7 +117,8 @@ router.get(
         studentName: u.student_name ?? null,
         school: u.school ?? null,
         division: u.division ?? null,
-        logins: 0, totalSessionMs: 0, videoViews: 0, videoWatchMs: 0,
+        logins: 0, activeSessions: 0, totalSessionMs: 0,
+        videoViews: 0, videoWatchMs: 0,
         mcqAttempts: 0, avgPercentage: 0,
       });
     }
@@ -123,6 +126,7 @@ router.get(
       const x = map.get(Number(r.userId));
       if (!x) continue;
       x.logins = Number(r.logins);
+      x.activeSessions = Number(r.activeSessions);
       x.totalSessionMs = Number(r.totalSessionMs);
     }
     for (const r of videoRows) {

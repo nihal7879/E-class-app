@@ -1,12 +1,9 @@
 import { useEffect, useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
-import {
-  computeSchoolCourses,
-  computeSchoolDailyActivity,
-  computeStudentStats,
-} from "@/lib/aggregations";
+import { useDailyActivity, useSchoolCourses, useStudents } from "@/lib/hooks";
 import { useFilter } from "@/lib/filterContext";
 import { formatNumber, schoolFromId, schoolId as toSchoolId } from "@/lib/parse";
+import type { StudentStat } from "@/lib/types";
 import KpiTile from "@/components/kpi/KpiTile";
 import DailyActivityChart from "@/components/charts/DailyActivityChart";
 import StudentBreakdownChart from "@/components/charts/StudentBreakdownChart";
@@ -16,7 +13,7 @@ import SectionHeader from "@/components/ui/SectionHeader";
 export default function SchoolDetailPage() {
   const { schoolId: id } = useParams<{ schoolId: string }>();
   const school = id ? schoolFromId(id) : "";
-  const { filter, setFilter } = useFilter();
+  const { setFilter } = useFilter();
 
   // Keep the schools filter in sync with the URL school so the Filter popover
   // reflects the current view, and so changes to it can navigate elsewhere.
@@ -29,18 +26,44 @@ export default function SchoolDetailPage() {
     );
   }, [school, setFilter]);
 
-  const students = useMemo(() => computeStudentStats(school, filter), [school, filter]);
-  const daily = useMemo(
-    () => computeSchoolDailyActivity(school, filter),
-    [school, filter],
-  );
-  const courseCount = useMemo(
-    () => (school ? computeSchoolCourses(school, filter).length : 0),
-    [school, filter],
-  );
+  // Pin the school in the request directly — don't wait for the context-sync
+  // effect to write it to filter.schools (that caused a race where the first
+  // render fetched with the WRONG school, then re-fetched with the right one).
+  const extra = useMemo(() => ({ schools: school ? [school] : [] }), [school]);
+  const studentsApi = useStudents({ sort: "sessionMs", limit: 1000, extra });
+  const dailyApi = useDailyActivity(extra);
+  const coursesApi = useSchoolCourses(school);
 
-  const topStudents = students.slice(0, 5);
-  const lowStudents = students
+  const students: StudentStat[] = useMemo(
+    () =>
+      (studentsApi.data?.items ?? []).map((s) => ({
+        enrollmentId: s.enrollmentId ?? String(s.userId),
+        studentName: s.studentName ?? "",
+        // "Session" = login with session_time >= 1 min. Instant logouts are
+        // excluded so the count reflects real watching activity.
+        sessions: s.activeSessions,
+        totalSessionMs: s.totalSessionMs,
+        logins: s.logins,
+      })),
+    [studentsApi.data],
+  );
+  const daily = useMemo(
+    () =>
+      (dailyApi.data?.series ?? []).map((d) => ({
+        date: d.date,
+        logins: d.logins,
+        uniqueStudents: d.uniqueStudents,
+      })),
+    [dailyApi.data],
+  );
+  const courseCount = coursesApi.data?.items.length ?? 0;
+
+  const sortedDesc = useMemo(
+    () => [...students].sort((a, b) => b.totalSessionMs - a.totalSessionMs),
+    [students],
+  );
+  const topStudents = sortedDesc.slice(0, 5);
+  const lowStudents = sortedDesc
     .filter((s) => s.totalSessionMs > 0)
     .slice(-5)
     .reverse();

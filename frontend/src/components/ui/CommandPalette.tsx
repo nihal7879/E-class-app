@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import clsx from "clsx";
 import { useCommandPalette } from "@/lib/commandPalette";
-import { getCatalogue } from "@/lib/aggregations";
+import { useCatalogue } from "@/lib/hooks";
 import { schoolId } from "@/lib/parse";
 
 interface Item {
@@ -21,7 +21,8 @@ export default function CommandPalette() {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
 
-  const cat = useMemo(() => getCatalogue(), []);
+  const { data: cat } = useCatalogue();
+  const schools = cat?.schools ?? [];
 
   const allItems: Item[] = useMemo(() => {
     const navItems: Item[] = [
@@ -32,14 +33,14 @@ export default function CommandPalette() {
         onSelect: () => nav("/dashboard"),
       },
     ];
-    const schoolItems: Item[] = cat.schools.map((s) => ({
+    const schoolItems: Item[] = schools.map((s) => ({
       kind: "school",
       label: s,
       hint: "School detail",
       onSelect: () => nav(`/school/${schoolId(s)}`),
     }));
     return [...navItems, ...schoolItems];
-  }, [cat.schools, nav]);
+  }, [schools, nav]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

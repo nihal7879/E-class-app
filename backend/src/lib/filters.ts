@@ -1,9 +1,19 @@
 import { z } from "zod";
 
+// Multi-value filters arrive as either a single string (?schools=A) or a
+// repeated param array (?schools=A&schools=B). We DO NOT split on commas —
+// some school/course names contain commas (e.g. "Jilha Parishad Prathamik
+// Shala, Nandanmal"), and a CSV split would shred them into non-matching
+// halves and return empty results. Clients that need multiple values must
+// use the repeated-param form.
 const CsvList = z
-  .string()
+  .union([z.string(), z.array(z.string())])
   .optional()
-  .transform((v) => (v ? v.split(",").map((s) => s.trim()).filter(Boolean) : []));
+  .transform((v) => {
+    if (v === undefined) return [];
+    const raw = Array.isArray(v) ? v : [v];
+    return raw.map((s) => s.trim()).filter(Boolean);
+  });
 
 const YearOrAll = z
   .string()

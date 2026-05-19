@@ -1,17 +1,28 @@
-import { useMemo } from "react";
-import { computeKpis } from "@/lib/aggregations";
-import { useFilter } from "@/lib/filterContext";
+import { useKpis } from "@/lib/hooks";
 import { formatHours, formatNumber } from "@/lib/parse";
 import KpiTile from "./KpiTile";
 
 export default function KpiStrip() {
-  const { filter } = useFilter();
-  const k = useMemo(() => computeKpis(filter), [filter]);
+  const { data, loading, error } = useKpis();
 
-  const hours = k.totalLearningMs / 3_600_000;
+  if (error) {
+    return (
+      <section className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+        Could not load KPIs: {error}
+      </section>
+    );
+  }
+
+  const k = data ?? {
+    totalLogins: 0, totalSessionMs: 0, avgSessionMs: 0, uniqueUsers: 0,
+    videoViews: 0, videoWatchMs: 0, mcqAttempts: 0, avgPercentage: 0,
+    totalSchools: 0, totalCourses: 0,
+  };
+  const hours = k.videoWatchMs / 3_600_000;
+  const opacity = loading && !data ? "opacity-60" : "";
 
   return (
-    <section className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+    <section className={`grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5 ${opacity}`}>
       <KpiTile
         tone="indigo"
         label="Schools"
@@ -22,7 +33,7 @@ export default function KpiStrip() {
       <KpiTile
         tone="violet"
         label="Students"
-        value={formatNumber(k.totalStudents)}
+        value={formatNumber(k.uniqueUsers)}
         hint="Unique learners"
         icon={<UsersIcon />}
       />
@@ -38,7 +49,7 @@ export default function KpiStrip() {
         label="Learning hours"
         value={hours >= 10 ? hours.toFixed(0) : hours.toFixed(1)}
         unit="hrs"
-        hint={`${formatHours(k.totalLearningMs)} watched`}
+        hint={`${formatHours(k.videoWatchMs)} watched`}
         icon={<ClockIcon />}
       />
       <KpiTile

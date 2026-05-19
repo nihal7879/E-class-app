@@ -11,8 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { computeMcqOverview } from "@/lib/aggregations";
-import { useFilter } from "@/lib/filterContext";
+import { useMcqOverview } from "@/lib/hooks";
 import {
   courseId as toCourseId,
   formatCourseLabel,
@@ -24,6 +23,17 @@ import { CustomTooltip } from "./Tooltip";
 import { AXIS_COLOR, AXIS_TICK_STYLE, GRID_COLOR, GRID_DASH } from "./theme";
 
 const TOP_N_DEFAULT = 6;
+
+import type { McqOverviewResponse } from "@/lib/apiTypes";
+
+const EMPTY_OVERVIEW: McqOverviewResponse = {
+  totalAttempts: 0,
+  avgPercentage: 0,
+  uniqueStudents: 0,
+  avgTimeSpentMs: 0,
+  courses: [],
+  scoreDistribution: [],
+};
 
 // Red (low) -> green (high) accuracy scale.
 function colorForPct(pct: number): string {
@@ -44,9 +54,9 @@ function formatTime(ms: number): string {
 }
 
 export default function McqResultsCard() {
-  const { filter } = useFilter();
   const navigate = useNavigate();
-  const overview = useMemo(() => computeMcqOverview(filter), [filter]);
+  const { data, loading, error } = useMcqOverview();
+  const overview = data ?? EMPTY_OVERVIEW;
   const [showAll, setShowAll] = useState(false);
 
   const hasData = overview.totalAttempts > 0;
@@ -97,7 +107,13 @@ export default function McqResultsCard() {
         ) : undefined
       }
     >
-      {!hasData ? (
+      {error ? (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          Could not load MCQ results: {error}
+        </div>
+      ) : loading && !data ? (
+        <div className="flex h-[200px] items-center justify-center text-sm text-slate-400">Loading…</div>
+      ) : !hasData ? (
         <Empty />
       ) : (
         <div className="space-y-4">
@@ -209,7 +225,7 @@ function CourseAccuracyRow({
   course,
   onOpen,
 }: {
-  course: import("@/lib/aggregations").McqCourseBreakdown;
+  course: import("@/lib/apiTypes").McqCourseBreakdown;
   onOpen: () => void;
 }) {
   const courseColor = colorForPct(course.avgPercentage);

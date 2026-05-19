@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
-import { computeSchoolCourseStats } from "@/lib/aggregations";
+import { useSchoolCourses } from "@/lib/hooks";
 import { useFilter } from "@/lib/filterContext";
 import {
   courseId as toCourseId,
@@ -11,10 +11,19 @@ import {
 } from "@/lib/parse";
 import SectionHeader from "@/components/ui/SectionHeader";
 
+interface SchoolCourseStat {
+  course: string;
+  students: number;
+  subjects: number;
+  videoViews: number;
+  videoDurationMs: number;
+  mcqAttempts: number;
+}
+
 export default function SchoolCoursesPage() {
   const { schoolId: id } = useParams<{ schoolId: string }>();
   const school = id ? schoolFromId(id) : "";
-  const { filter, setFilter } = useFilter();
+  const { setFilter } = useFilter();
 
   useEffect(() => {
     if (!school) return;
@@ -25,9 +34,18 @@ export default function SchoolCoursesPage() {
     );
   }, [school, setFilter]);
 
-  const courses = useMemo(
-    () => (school ? computeSchoolCourseStats(school, filter) : []),
-    [school, filter],
+  const { data } = useSchoolCourses(school);
+  const courses: SchoolCourseStat[] = useMemo(
+    () =>
+      (data?.items ?? []).map((c) => ({
+        course: c.course,
+        students: c.uniqueStudents,
+        subjects: c.subjects,
+        videoViews: c.videoViews,
+        videoDurationMs: c.videoWatchMs,
+        mcqAttempts: c.mcqAttempts,
+      })),
+    [data],
   );
 
   const backHref = school ? `/school/${toSchoolId(school)}` : "/dashboard";
@@ -93,7 +111,7 @@ function CourseCard({
   stat,
   href,
 }: {
-  stat: ReturnType<typeof computeSchoolCourseStats>[number];
+  stat: SchoolCourseStat;
   href: string;
 }) {
   const hours = stat.videoDurationMs / 3_600_000;

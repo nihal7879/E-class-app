@@ -23,11 +23,15 @@ router.get(
       divisionColumn: "u.division",
       genderColumn: "u.gender",
     });
+    // "session" = login with session_time >= 1 minute (skip instant-logout rows).
+    // "logins"  = every login_history row, raw.
     const [loginRows] = await pool.query<any[]>(
       `SELECT
          COUNT(*)                                                   AS totalLogins,
+         SUM(CASE WHEN TIME_TO_SEC(lh.session_time) >= 60 THEN 1 ELSE 0 END) AS activeSessions,
          COALESCE(SUM(TIME_TO_SEC(lh.session_time)), 0) * 1000       AS totalSessionMs,
-         COALESCE(AVG(TIME_TO_SEC(lh.session_time)), 0) * 1000       AS avgSessionMs,
+         COALESCE(AVG(CASE WHEN TIME_TO_SEC(lh.session_time) >= 60
+                           THEN TIME_TO_SEC(lh.session_time) END), 0) * 1000 AS avgSessionMs,
          COUNT(DISTINCT lh.user_id)                                  AS uniqueUsers
        FROM login_history lh
        JOIN users u ON u.user_id = lh.user_id
@@ -69,8 +73,42 @@ router.get(
       mcq.params,
     );
 
+    // Distinct schools that have ANY activity inside the filter window.
+    // Union the schools seen in logins + videos so a school with no logins but
+    // video activity still counts.
+    const schoolUnion = buildWhereClause(filter, {
+      dateColumn: "lh.login_date",
+      schoolColumn: "u.school",
+      divisionColumn: "u.division",
+      genderColumn: "u.gender",
+    });
+    const schoolUnionV = buildWhereClause(filter, {
+      dateColumn: "vu.last_access_date",
+      schoolColumn: "u.school",
+      courseColumn: "vu.course",
+      divisionColumn: "u.division",
+      genderColumn: "u.gender",
+    });
+    const [schoolCountRows] = await pool.query<any[]>(
+      `SELECT COUNT(DISTINCT s) AS n FROM (
+         SELECT u.school AS s FROM login_history lh JOIN users u ON u.user_id = lh.user_id ${schoolUnion.where}
+         UNION
+         SELECT u.school AS s FROM video_usage vu  JOIN users u ON u.user_id = vu.user_id ${schoolUnionV.where}
+       ) t WHERE s IS NOT NULL AND s <> ''`,
+      [...schoolUnion.params, ...schoolUnionV.params],
+    );
+
+    const [courseCountRows] = await pool.query<any[]>(
+      `SELECT COUNT(DISTINCT vu.course) AS n
+       FROM video_usage vu
+       JOIN users u ON u.user_id = vu.user_id
+       ${video.where ? video.where + " AND " : " WHERE "}vu.course IS NOT NULL AND vu.course <> ''`,
+      video.params,
+    );
+
     res.json({
       totalLogins:    Number(loginRows[0]?.totalLogins ?? 0),
+      activeSessions: Number(loginRows[0]?.activeSessions ?? 0),
       totalSessionMs: Number(loginRows[0]?.totalSessionMs ?? 0),
       avgSessionMs:   Number(loginRows[0]?.avgSessionMs ?? 0),
       uniqueUsers:    Number(loginRows[0]?.uniqueUsers ?? 0),
@@ -78,6 +116,8 @@ router.get(
       videoWatchMs:   Number(videoRows[0]?.videoWatchMs ?? 0),
       mcqAttempts:    Number(mcqRows[0]?.mcqAttempts ?? 0),
       avgPercentage:  Number(mcqRows[0]?.avgPercentage ?? 0),
+      totalSchools:   Number(schoolCountRows[0]?.n ?? 0),
+      totalCourses:   Number(courseCountRows[0]?.n ?? 0),
     });
   }),
 );

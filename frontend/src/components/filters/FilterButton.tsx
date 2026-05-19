@@ -9,8 +9,15 @@ import {
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
-import { availableFilterOptions } from "@/lib/aggregations";
+import { useCatalogue } from "@/lib/hooks";
 import { useFilter } from "@/lib/filterContext";
+
+const EMPTY_CAT = {
+  years: [] as number[], months: [] as number[],
+  schools: [] as string[], courses: [] as string[],
+  divisions: [] as string[], genders: [] as string[],
+  minDate: null as string | null, maxDate: null as string | null,
+};
 import {
   formatCourseLabel,
   schoolId,
@@ -33,7 +40,10 @@ export default function FilterButton() {
   const nav = useNavigate();
   const isSm = useIsSm();
   const onDetail = loc.pathname.startsWith("/school/");
-  const available = useMemo(() => availableFilterOptions(filter), [filter]);
+  // Server-backed: full catalogue. (Cascading "narrow to compatible values" is
+  // an enhancement we can layer on a future /api/filters/cascade endpoint.)
+  const { data: catData } = useCatalogue();
+  const available = catData ?? EMPTY_CAT;
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -270,8 +280,8 @@ function shiftDays(date: string, days: number): string {
 }
 
 interface DateRangeSectionProps {
-  minDate: string;
-  maxDate: string;
+  minDate: string | null;
+  maxDate: string | null;
   dateFrom?: string;
   dateTo?: string;
   onChange: (from?: string, to?: string) => void;
@@ -314,7 +324,7 @@ function DateRangeSection({
         from: `${y}-${m}-01`,
         to: `${y}-${m}-${lastDayOfMonth}`,
       },
-      { label: "All time", from: minDate, to: maxDate },
+      { label: "All time", from: minDate as string, to: maxDate as string },
     ];
   }, [minDate, maxDate]);
 

@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import clsx from "clsx";
-import { computeVideoUsageOverview } from "@/lib/aggregations";
-import { useFilter } from "@/lib/filterContext";
+import { useVideoOverview } from "@/lib/hooks";
 import {
   courseId as toCourseId,
   formatCourseLabel,
@@ -15,10 +14,21 @@ import { CHART_PALETTE } from "./theme";
 
 const TOP_N_DEFAULT = 6;
 
+import type { VideoOverviewResponse } from "@/lib/apiTypes";
+
+const EMPTY_OVERVIEW: VideoOverviewResponse = {
+  totalViews: 0,
+  totalDurationMs: 0,
+  uniqueStudents: 0,
+  uniqueContent: 0,
+  courses: [],
+  contentTypeMix: [],
+};
+
 export default function VideoUsageCard() {
-  const { filter } = useFilter();
   const navigate = useNavigate();
-  const overview = useMemo(() => computeVideoUsageOverview(filter), [filter]);
+  const { data, loading, error } = useVideoOverview();
+  const overview = data ?? EMPTY_OVERVIEW;
   const [showAll, setShowAll] = useState(false);
 
   const hasData = overview.totalViews > 0;
@@ -83,7 +93,13 @@ export default function VideoUsageCard() {
         ) : undefined
       }
     >
-      {!hasData ? (
+      {error ? (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          Could not load video usage: {error}
+        </div>
+      ) : loading && !data ? (
+        <div className="flex h-[200px] items-center justify-center text-sm text-slate-400">Loading…</div>
+      ) : !hasData ? (
         <Empty />
       ) : (
         <div className="space-y-4">
@@ -140,7 +156,7 @@ export default function VideoUsageCard() {
 }
 
 interface CourseRowProps {
-  course: import("@/lib/aggregations").VideoCourseBreakdown;
+  course: import("@/lib/apiTypes").VideoCourseBreakdown;
   maxMs: number;
   subjectPalette: Map<string, string>;
   onOpen: () => void;

@@ -22,7 +22,9 @@ router.get(
       genderColumn: "u.gender",
     });
     const [loginRows] = await pool.query<any[]>(
-      `SELECT lh.login_date AS date, COUNT(*) AS logins
+      `SELECT lh.login_date AS date,
+              COUNT(*)                   AS logins,
+              COUNT(DISTINCT lh.user_id) AS uniqueStudents
        FROM login_history lh
        JOIN users u ON u.user_id = lh.user_id
        ${login.where}
@@ -65,12 +67,16 @@ router.get(
       mcq.params,
     );
 
-    const map = new Map<string, { date: string; logins: number; videoViews: number; mcqAttempts: number }>();
+    const map = new Map<string, { date: string; logins: number; uniqueStudents: number; videoViews: number; mcqAttempts: number }>();
     const upsert = (date: string) => {
-      if (!map.has(date)) map.set(date, { date, logins: 0, videoViews: 0, mcqAttempts: 0 });
+      if (!map.has(date)) map.set(date, { date, logins: 0, uniqueStudents: 0, videoViews: 0, mcqAttempts: 0 });
       return map.get(date)!;
     };
-    for (const r of loginRows) upsert(r.date).logins = Number(r.logins);
+    for (const r of loginRows) {
+      const x = upsert(r.date);
+      x.logins = Number(r.logins);
+      x.uniqueStudents = Number(r.uniqueStudents);
+    }
     for (const r of videoRows) upsert(r.date).videoViews = Number(r.videoViews);
     for (const r of mcqRows)   upsert(r.date).mcqAttempts = Number(r.mcqAttempts);
 

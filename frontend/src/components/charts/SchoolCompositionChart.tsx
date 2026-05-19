@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import clsx from "clsx";
-import { computeSchoolComposition } from "@/lib/aggregations";
-import { useFilter } from "@/lib/filterContext";
+import { useSchoolsComposition } from "@/lib/hooks";
 import { formatNumber } from "@/lib/parse";
-import type { SchoolCompositionStat } from "@/lib/types";
+import type { SchoolCompositionItem } from "@/lib/apiTypes";
 import ChartCard from "./ChartCard";
+
+type SchoolCompositionStat = SchoolCompositionItem;
 
 const TOP_N_DEFAULT = 6;
 
@@ -58,8 +59,8 @@ interface Props {
 }
 
 export default function SchoolCompositionChart({ onSchoolClick }: Props) {
-  const { filter } = useFilter();
-  const stats = useMemo(() => computeSchoolComposition(filter), [filter]);
+  const { data, loading, error } = useSchoolsComposition();
+  const stats: SchoolCompositionStat[] = data?.items ?? [];
   const [showAll, setShowAll] = useState(false);
   const [view, setView] = useState<ViewMetric>("all");
   const [hoverMetric, setHoverMetric] = useState<MetricKey | null>(null);
@@ -156,7 +157,15 @@ export default function SchoolCompositionChart({ onSchoolClick }: Props) {
         </>
       }
     >
-      {stats.length === 0 ? (
+      {error ? (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          Could not load school activity: {error}
+        </div>
+      ) : loading && stats.length === 0 ? (
+        <div className="flex h-[280px] items-center justify-center text-sm text-slate-400">
+          Loading…
+        </div>
+      ) : stats.length === 0 ? (
         <EmptyState />
       ) : (
         <>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
-import { computeCourseSubjectStats } from "@/lib/aggregations";
+import { useCourseSubjects } from "@/lib/hooks";
 import { useFilter } from "@/lib/filterContext";
 import {
   courseFromId,
@@ -20,12 +20,8 @@ export default function CourseSubjectsPage() {
   }>();
   const school = sId ? schoolFromId(sId) : "";
   const course = cId ? courseFromId(cId) : "";
-  const { filter, setFilter } = useFilter();
+  const { setFilter } = useFilter();
 
-  // Sync only the school to the global filter — the course scope lives in the
-  // URL and is applied by computeCourseSubjectStats internally. Writing the
-  // course into filter.courses would persist after navigating back and hide
-  // the other courses on SchoolCoursesPage.
   useEffect(() => {
     if (!school) return;
     setFilter((f) =>
@@ -35,10 +31,22 @@ export default function CourseSubjectsPage() {
     );
   }, [school, setFilter]);
 
+  // Pin the school via explicit override so we don't depend on the filter-sync
+  // effect (which used to cause a race-induced double fetch on navigation).
+  const extra = useMemo(() => ({ schools: school ? [school] : [] }), [school]);
+  const { data } = useCourseSubjects(school && course ? course : undefined, extra);
   const subjects = useMemo(
     () =>
-      school && course ? computeCourseSubjectStats(school, course, filter) : [],
-    [school, course, filter],
+      (data?.items ?? []).map((s) => ({
+        subject: s.subject,
+        students: s.students,
+        chapters: s.chapters,
+        videoViews: s.videoViews,
+        videoDurationMs: s.videoWatchMs,
+        mcqAttempts: s.mcqAttempts,
+        avgMcqPercentage: s.avgPercentage,
+      })),
+    [data],
   );
 
   const coursesHref = school ? `/school/${toSchoolId(school)}/courses` : "/dashboard";
@@ -100,11 +108,21 @@ export default function CourseSubjectsPage() {
   );
 }
 
+interface SubjectStat {
+  subject: string;
+  students: number;
+  chapters: number;
+  videoViews: number;
+  videoDurationMs: number;
+  mcqAttempts: number;
+  avgMcqPercentage: number;
+}
+
 function SubjectCard({
   stat,
   href,
 }: {
-  stat: ReturnType<typeof computeCourseSubjectStats>[number];
+  stat: SubjectStat;
   href: string;
 }) {
   const hours = stat.videoDurationMs / 3_600_000;

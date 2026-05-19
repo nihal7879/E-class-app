@@ -1,11 +1,26 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import {
-  computeSubjectDetail,
-  type SubjectChapterStat,
-  type SubjectStudentStat,
-} from "@/lib/aggregations";
+import { useSubjectDetail, useSubjectStudents } from "@/lib/hooks";
 import { useFilter } from "@/lib/filterContext";
+
+interface SubjectChapterStat {
+  chapter: string;
+  students: number;
+  contentItems: number;
+  videoViews: number;
+  videoDurationMs: number;
+  mcqAttempts: number;
+}
+interface SubjectStudentStat {
+  userId: number;
+  enrollmentId: string;
+  studentName: string;
+  division: string;
+  videoViews: number;
+  videoDurationMs: number;
+  chaptersTouched: number;
+  mcqAttempts: number;
+}
 import {
   courseFromId,
   courseId as toCourseId,
@@ -43,7 +58,7 @@ export default function SubjectDetailPage() {
   const school = sId ? schoolFromId(sId) : "";
   const course = cId ? courseFromId(cId) : "";
   const subject = subId ? subjectFromId(subId) : "";
-  const { filter, setFilter } = useFilter();
+  const { setFilter } = useFilter();
 
   useEffect(() => {
     if (!school) return;
@@ -54,13 +69,43 @@ export default function SubjectDetailPage() {
     );
   }, [school, setFilter]);
 
-  const detail = useMemo(
-    () =>
-      school && course && subject
-        ? computeSubjectDetail(school, course, subject, filter)
-        : null,
-    [school, course, subject, filter],
-  );
+  // Pin school directly so the data is scoped before the filter-sync effect
+  // has a chance to run — avoids the race that produced wrong/empty results.
+  const extra = useMemo(() => ({ schools: school ? [school] : [] }), [school]);
+  const detailApi = useSubjectDetail(subject || undefined, extra);
+  const studentsApi = useSubjectStudents(subject || undefined, extra);
+
+  const detail = useMemo(() => {
+    const d = detailApi.data;
+    if (!d) return null;
+    const chapters: SubjectChapterStat[] = d.chapterBreakdown.map((c) => ({
+      chapter: c.chapter,
+      students: 0,
+      contentItems: c.contents,
+      videoViews: c.videoViews,
+      videoDurationMs: c.videoWatchMs,
+      mcqAttempts: 0,
+    }));
+    const students: SubjectStudentStat[] = (studentsApi.data?.items ?? []).map((s) => ({
+      userId: s.userId,
+      enrollmentId: s.enrollmentId,
+      studentName: s.studentName,
+      division: s.division,
+      videoViews: s.videoViews,
+      videoDurationMs: s.videoDurationMs,
+      chaptersTouched: s.chaptersTouched,
+      mcqAttempts: s.mcqAttempts,
+    }));
+    return {
+      totalStudents: d.uniqueStudents,
+      totalChapters: d.chapters,
+      videoViews: d.videoViews,
+      videoDurationMs: d.videoWatchMs,
+      mcqAttempts: d.mcqAttempts,
+      chapters,
+      students,
+    };
+  }, [detailApi.data, studentsApi.data]);
 
   const subjectsHref =
     school && course

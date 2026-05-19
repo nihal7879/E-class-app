@@ -47,6 +47,14 @@ router.get(
       `SELECT DISTINCT gender FROM users WHERE gender IS NOT NULL AND gender <> '' ORDER BY gender`,
     );
 
+    const [bounds] = await pool.query<any[]>(
+      `SELECT MIN(d) AS minDate, MAX(d) AS maxDate FROM (
+         SELECT login_date AS d FROM login_history WHERE login_date IS NOT NULL
+         UNION ALL SELECT last_access_date FROM video_usage    WHERE last_access_date IS NOT NULL
+         UNION ALL SELECT attempted_date   FROM mcq_report     WHERE attempted_date   IS NOT NULL
+       ) t`,
+    );
+
     res.json({
       years: yearRows.map((r) => r.y),
       months: monthRows.map((r) => r.m),
@@ -54,6 +62,8 @@ router.get(
       courses: courseRows.map((r) => r.course),
       divisions: divisionRows.map((r) => r.division),
       genders: genderRows.map((r) => r.gender),
+      minDate: bounds[0]?.minDate ?? null,
+      maxDate: bounds[0]?.maxDate ?? null,
     });
   }),
 );

@@ -1,13 +1,15 @@
-import { useMemo } from "react";
-import { getCatalogue } from "@/lib/aggregations";
+import { useCatalogue } from "@/lib/hooks";
 import { useFilter } from "@/lib/filterContext";
 import { MONTH_LABELS, shortSchoolName } from "@/lib/parse";
 import MultiSelect from "./MultiSelect";
 import SingleSelect from "./SingleSelect";
 
+const EMPTY_CAT = { years: [], months: [], schools: [], courses: [], divisions: [], genders: [] };
+
 export default function FilterBar() {
   const { filter, setFilter, reset, hasActive } = useFilter();
-  const cat = useMemo(() => getCatalogue(), []);
+  const { data } = useCatalogue();
+  const cat = data ?? EMPTY_CAT;
 
   const yearOptions = [
     { value: "all" as const, label: "All years" },

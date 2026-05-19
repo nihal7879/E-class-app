@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { computeCourseOverview } from "@/lib/aggregations";
-import { useFilter } from "@/lib/filterContext";
+import { useCourseDetail, useCourseSchools, useCourseSubjects } from "@/lib/hooks";
 import {
   courseFromId,
   formatCourseLabel,
@@ -10,6 +9,24 @@ import {
   schoolId as toSchoolId,
 } from "@/lib/parse";
 import SectionHeader from "@/components/ui/SectionHeader";
+
+interface CourseOverviewSubject {
+  subject: string;
+  students: number;
+  chapters: number;
+  videoViews: number;
+  videoDurationMs: number;
+  mcqAttempts: number;
+  avgMcqPercentage: number;
+}
+interface CourseOverviewSchool {
+  school: string;
+  students: number;
+  videoViews: number;
+  videoDurationMs: number;
+  mcqAttempts: number;
+  avgMcqPercentage: number;
+}
 
 type SubjectSortKey =
   | "subject"
@@ -39,17 +56,55 @@ function colorForPct(pct: number): string {
 export default function CourseOverviewPage() {
   const { courseId } = useParams<{ courseId: string }>();
   const course = courseId ? courseFromId(courseId) : "";
-  const { filter } = useFilter();
 
-  const data = useMemo(
-    () => (course ? computeCourseOverview(course, filter) : null),
-    [course, filter],
+  const detailApi = useCourseDetail(course || undefined);
+  const subjectsApi = useCourseSubjects(course || undefined);
+  const schoolsApi = useCourseSchools(course || undefined);
+
+  const data = useMemo(() => {
+    const d = detailApi.data;
+    if (!d) return null;
+    return {
+      totalSchools:    d.schools,
+      totalStudents:   d.uniqueStudents,
+      totalSubjects:   d.subjects,
+      videoViews:      d.videoViews,
+      videoDurationMs: d.videoWatchMs,
+      mcqAttempts:     d.mcqAttempts,
+      avgMcqPercentage: d.avgPercentage,
+    };
+  }, [detailApi.data]);
+
+  const subjects: CourseOverviewSubject[] = useMemo(
+    () =>
+      (subjectsApi.data?.items ?? []).map((s) => ({
+        subject: s.subject,
+        students: s.students,
+        chapters: s.chapters,
+        videoViews: s.videoViews,
+        videoDurationMs: s.videoWatchMs,
+        mcqAttempts: s.mcqAttempts,
+        avgMcqPercentage: s.avgPercentage,
+      })),
+    [subjectsApi.data],
+  );
+  const schools: CourseOverviewSchool[] = useMemo(
+    () =>
+      (schoolsApi.data?.items ?? []).map((s) => ({
+        school: s.school,
+        students: s.students,
+        videoViews: s.videoViews,
+        videoDurationMs: s.videoWatchMs,
+        mcqAttempts: s.mcqAttempts,
+        avgMcqPercentage: s.avgPercentage,
+      })),
+    [schoolsApi.data],
   );
 
   if (!course || !data) {
     return (
       <div className="card flex items-center justify-center p-10 text-[13px] text-slate-500">
-        Course not found.
+        {detailApi.error ? `Error: ${detailApi.error}` : "Loading…"}
       </div>
     );
   }
@@ -130,7 +185,7 @@ export default function CourseOverviewPage() {
               title="Subjects in this standard"
               description="Across all schools — sorted by combined video + MCQ activity."
             />
-            <SubjectTable subjects={data.subjects} />
+            <SubjectTable subjects={subjects} />
           </div>
 
           <div>
@@ -138,7 +193,7 @@ export default function CourseOverviewPage() {
               title="Schools using this standard"
               description="Where this standard is being consumed — click a school to drill into its students."
             />
-            <SchoolTable course={course} schools={data.schools} />
+            <SchoolTable course={course} schools={schools} />
           </div>
         </>
       )}
@@ -151,7 +206,7 @@ export default function CourseOverviewPage() {
 function SubjectTable({
   subjects,
 }: {
-  subjects: import("@/lib/aggregations").CourseOverviewSubject[];
+  subjects: CourseOverviewSubject[];
 }) {
   const [sortKey, setSortKey] = useState<SubjectSortKey>("videoDurationMs");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -302,7 +357,7 @@ function SchoolTable({
   schools,
 }: {
   course: string;
-  schools: import("@/lib/aggregations").CourseOverviewSchool[];
+  schools: CourseOverviewSchool[];
 }) {
   const [sortKey, setSortKey] = useState<SchoolSortKey>("videoDurationMs");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");

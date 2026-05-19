@@ -12,8 +12,13 @@ import ChartCard from "./ChartCard";
 import { CustomTooltip } from "./Tooltip";
 import { AXIS_COLOR, AXIS_TICK_STYLE, GRID_COLOR, GRID_DASH } from "./theme";
 
+interface DailyPoint {
+  date: string;
+  logins: number;
+  uniqueStudents: number;
+}
 interface Props {
-  data: { date: string; logins: number; uniqueStudents: number }[];
+  data: DailyPoint[];
 }
 
 export default function DailyActivityChart({ data }: Props) {
