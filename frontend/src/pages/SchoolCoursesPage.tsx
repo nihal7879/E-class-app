@@ -95,7 +95,7 @@ export default function SchoolCoursesPage() {
             No courses for this school under the current filters.
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="flex flex-col gap-3">
             {courses.map((c) => (
               <CourseCard
                 key={c.course}
@@ -126,24 +126,25 @@ function CourseCard({
     <Link
       to={href}
       aria-label={`View subjects for ${formatCourseLabel(stat.course)}`}
-      className="card card-hover group flex flex-col gap-3 p-4 outline-none transition focus-visible:ring-2 focus-visible:ring-accent-200 sm:p-5"
+      className="card card-hover group flex flex-col gap-4 p-4 outline-none transition focus-visible:ring-2 focus-visible:ring-accent-200 sm:flex-row sm:items-center sm:gap-5 sm:p-5"
     >
-      <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+      {/* Left: icon + title */}
+      <div className="flex items-center gap-3 sm:min-w-[220px] sm:max-w-[280px] sm:flex-1">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
           <BookIcon />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[11.5px] font-medium uppercase tracking-wide text-slate-500">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
             Course
           </div>
-          <div className="truncate text-[15px] font-semibold text-slate-900">
+          <div className="truncate text-[15px] font-semibold text-slate-900 group-hover:text-emerald-700">
             {formatCourseLabel(stat.course)}
           </div>
         </div>
-        <ChevronRightIcon />
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5 text-[12px]">
+      {/* Middle: metrics in fixed-width columns so numbers align across rows */}
+      <div className="grid grid-cols-2 gap-2.5 sm:flex sm:flex-1 sm:items-center sm:justify-end sm:gap-6">
         <Metric label="Students" value={formatNumber(stat.students)} />
         <Metric label="Subjects" value={formatNumber(stat.subjects)} />
         <Metric label="Video views" value={formatNumber(stat.videoViews)} />
@@ -152,16 +153,12 @@ function CourseCard({
           value={hours >= 10 ? hours.toFixed(0) : hours.toFixed(1)}
           unit="hrs"
         />
-        <Metric
-          label="MCQ attempts"
-          value={formatNumber(stat.mcqAttempts)}
-          span={2}
-        />
+        <Metric label="MCQ attempts" value={formatNumber(stat.mcqAttempts)} />
       </div>
 
-      <div className="mt-auto inline-flex items-center gap-1 text-[11.5px] font-semibold text-emerald-700">
-        View subjects
-        <ArrowRightIcon />
+      {/* Right: chevron only — whole card is clickable */}
+      <div className="hidden text-emerald-600 transition group-hover:translate-x-0.5 sm:flex sm:items-center sm:pl-2">
+        <ChevronRightIcon />
       </div>
     </Link>
   );
@@ -171,25 +168,20 @@ function Metric({
   label,
   value,
   unit,
-  span,
 }: {
   label: string;
   value: string;
   unit?: string;
-  span?: number;
 }) {
   return (
-    <div
-      className={
-        "rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 " +
-        (span === 2 ? "col-span-2" : "")
-      }
-    >
+    <div className="flex flex-col sm:w-[96px] sm:items-center sm:text-center">
       <div className="text-[10.5px] font-medium uppercase tracking-wide text-slate-500">
         {label}
       </div>
-      <div className="mt-0.5 flex items-baseline gap-1">
-        <span className="num text-[16px] font-bold text-slate-900">{value}</span>
+      <div className="mt-0.5 flex items-baseline gap-1 sm:justify-center">
+        <span className="num text-[15px] font-bold text-slate-900 tabular-nums">
+          {value}
+        </span>
         {unit && (
           <span className="text-[11px] font-medium text-slate-500">{unit}</span>
         )}
@@ -212,24 +204,6 @@ function ArrowLeftIcon() {
     >
       <line x1="19" y1="12" x2="5" y2="12" />
       <polyline points="12 19 5 12 12 5" />
-    </svg>
-  );
-}
-
-function ArrowRightIcon() {
-  return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <line x1="5" y1="12" x2="19" y2="12" />
-      <polyline points="12 5 19 12 12 19" />
     </svg>
   );
 }
