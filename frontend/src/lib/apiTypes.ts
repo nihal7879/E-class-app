@@ -259,3 +259,9 @@ export interface McqOverviewResponse {
   courses: McqCourseBreakdown[];
   scoreDistribution: { bucket: string; count: number }[];
 }
+
+
+
+
+
+

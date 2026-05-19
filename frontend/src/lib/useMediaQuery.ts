@@ -21,3 +21,8 @@ export function useMediaQuery(query: string): boolean {
 export const useIsSm = () => useMediaQuery("(min-width: 640px)");
 export const useIsMd = () => useMediaQuery("(min-width: 768px)");
 export const useIsLg = () => useMediaQuery("(min-width: 1024px)");
+
+
+
+
+
