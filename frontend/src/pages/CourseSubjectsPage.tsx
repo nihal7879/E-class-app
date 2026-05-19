@@ -13,7 +13,7 @@ import {
   subjectId as toSubjectId,
 } from "@/lib/parse";
 import SectionHeader from "@/components/ui/SectionHeader";
-import { CardGridSkeleton } from "@/components/ui/Skeleton";
+import { HorizontalCardListSkeleton } from "@/components/ui/Skeleton";
 
 export default function CourseSubjectsPage() {
   const { schoolId: sId, courseId: cId } = useParams<{
@@ -90,7 +90,7 @@ export default function CourseSubjectsPage() {
           description="Activity scoped to the current filter selections."
         />
         {loading && !data ? (
-          <CardGridSkeleton count={6} columns={3} />
+          <HorizontalCardListSkeleton count={5} metrics={5} />
         ) : subjects.length === 0 ? (
           <div className="card flex items-center justify-center p-10 text-[13px] text-slate-500">
             No subjects for this course under the current filters.

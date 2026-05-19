@@ -11,7 +11,7 @@ import {
   sortCourses,
 } from "@/lib/parse";
 import SectionHeader from "@/components/ui/SectionHeader";
-import { CardGridSkeleton } from "@/components/ui/Skeleton";
+import { HorizontalCardListSkeleton } from "@/components/ui/Skeleton";
 
 interface SchoolCourseStat {
   course: string;
@@ -89,7 +89,7 @@ export default function SchoolCoursesPage() {
           description="Activity scoped to the current filter selections."
         />
         {loading && !data ? (
-          <CardGridSkeleton count={6} columns={3} />
+          <HorizontalCardListSkeleton count={5} metrics={5} />
         ) : courses.length === 0 ? (
           <div className="card flex items-center justify-center p-10 text-[13px] text-slate-500">
             No courses for this school under the current filters.

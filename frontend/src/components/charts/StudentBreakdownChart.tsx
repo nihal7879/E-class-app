@@ -47,6 +47,9 @@ export default function StudentBreakdownChart({ students, loading = false }: Pro
               data={data}
               margin={{ top: 10, right: 8, bottom: 10, left: -8 }}
               barGap={4}
+              // Push categories apart when there are only a few students so
+              // the bars don't stretch into huge blocks on desktop.
+              barCategoryGap="30%"
             >
               <CartesianGrid
                 stroke={GRID_COLOR}
@@ -111,6 +114,8 @@ export default function StudentBreakdownChart({ students, loading = false }: Pro
                 radius={[4, 4, 0, 0]}
                 isAnimationActive
                 animationDuration={500}
+                // Cap pixel width so a 2-student chart doesn't render two giant blocks.
+                maxBarSize={48}
               />
               <Bar
                 yAxisId="hours"
@@ -120,6 +125,7 @@ export default function StudentBreakdownChart({ students, loading = false }: Pro
                 radius={[4, 4, 0, 0]}
                 isAnimationActive
                 animationDuration={500}
+                maxBarSize={48}
               />
             </BarChart>
           </ResponsiveContainer>

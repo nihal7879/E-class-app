@@ -163,6 +163,55 @@ export function BarChartSkeleton({
   );
 }
 
+// Horizontal-card list — used for the redesigned course/subject pages.
+// Mirrors the real card layout: icon + title on the left, 5 fixed-width metric
+// columns flowing to the right, chevron at the end.
+export function HorizontalCardListSkeleton({
+  count = 5,
+  metrics = 5,
+}: {
+  count?: number;
+  metrics?: number;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={i}
+          className="card flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:gap-5 sm:p-5"
+        >
+          {/* Left: icon + title */}
+          <div className="flex items-center gap-3 sm:min-w-[220px] sm:max-w-[280px] sm:flex-1">
+            <Skeleton className="h-11 w-11 shrink-0" rounded="xl" />
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <Skeleton className="h-2.5 w-14" />
+              <Skeleton className="h-4 w-40" />
+            </div>
+          </div>
+
+          {/* Middle: metric columns */}
+          <div className="grid grid-cols-2 gap-2.5 sm:flex sm:flex-1 sm:items-center sm:justify-end sm:gap-6">
+            {Array.from({ length: metrics }).map((_, j) => (
+              <div
+                key={j}
+                className="flex flex-col gap-1.5 sm:w-[96px] sm:items-center"
+              >
+                <Skeleton className="h-2.5 w-14" />
+                <Skeleton className="h-4 w-8" />
+              </div>
+            ))}
+          </div>
+
+          {/* Right: chevron placeholder */}
+          <div className="hidden sm:flex sm:items-center sm:pl-2">
+            <Skeleton className="h-4 w-3" rounded="sm" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Card grid — used for course/subject card listings.
 export function CardGridSkeleton({
   count = 6,
