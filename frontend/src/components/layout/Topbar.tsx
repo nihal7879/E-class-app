@@ -1,6 +1,8 @@
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { useCommandPalette } from "@/lib/commandPalette";
 import { useFilter } from "@/lib/filterContext";
+import { useAuth } from "@/lib/auth";
 import FilterButton from "@/components/filters/FilterButton";
 
 export default function Topbar() {
@@ -8,11 +10,39 @@ export default function Topbar() {
   const nav = useNavigate();
   const { setOpen: setPaletteOpen } = useCommandPalette();
   const { reset: resetFilter } = useFilter();
+  const { user, logout } = useAuth();
   const onDetail = loc.pathname.startsWith("/school/");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [menuOpen]);
+
+  const initials = (user?.username ?? "")
+    .split(/[.\s_-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0]?.toUpperCase() ?? "")
+    .join("") || "U";
 
   const handleBack = () => {
     resetFilter();
     nav("/dashboard");
+  };
+
+  const handleLogout = () => {
+    setMenuOpen(false);
+    resetFilter();
+    logout();
+    nav("/login", { replace: true });
   };
 
   return (
@@ -97,16 +127,51 @@ export default function Topbar() {
 
         <div className="hidden h-7 w-px bg-slate-200 sm:block" />
 
-        <div className="flex items-center gap-2">
-          <div className="hidden text-right leading-tight md:block">
-            <div className="text-[12.5px] font-semibold text-slate-900">
-              Nirav Mehta
+        <div className="relative" ref={menuRef}>
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            className="flex items-center gap-2 rounded-full p-0.5 pr-1 transition hover:bg-slate-100"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+          >
+            <div className="hidden text-right leading-tight md:block">
+              <div className="text-[12.5px] font-semibold text-slate-900">
+                {user?.username ?? "Guest"}
+              </div>
+              <div className="truncate text-[11px] text-slate-500">
+                {user?.instituteName ?? "—"}
+              </div>
             </div>
-            <div className="text-[11px] text-slate-500">Admin</div>
-          </div>
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-accent-400 to-accent-600 text-[12px] font-bold text-white shadow-sm ring-2 ring-white">
-            NM
-          </div>
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-accent-400 to-accent-600 text-[12px] font-bold text-white shadow-sm ring-2 ring-white">
+              {initials}
+            </div>
+          </button>
+
+          {menuOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-full z-30 mt-2 w-60 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-cardHover animate-popIn"
+            >
+              <div className="border-b border-slate-100 px-3.5 py-3">
+                <div className="text-[12.5px] font-semibold text-slate-900">
+                  {user?.username}
+                </div>
+                <div className="mt-0.5 truncate text-[11.5px] text-slate-500">
+                  {user?.instituteName}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-[12.5px] font-medium text-slate-700 transition hover:bg-slate-50"
+                role="menuitem"
+              >
+                <LogoutIcon />
+                Sign out
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>
@@ -134,6 +199,24 @@ function SearchIcon() {
     >
       <circle cx="11" cy="11" r="7" />
       <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+function LogoutIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
     </svg>
   );
 }
