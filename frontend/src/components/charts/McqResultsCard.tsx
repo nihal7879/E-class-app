@@ -74,7 +74,7 @@ export default function McqResultsCard() {
   const showToggle = overview.courses.length >= 2;
   const topLabel = Math.min(TOP_N_DEFAULT, overview.courses.length);
   const openCourse = (course: string) =>
-    navigate(`/course/${toCourseId(course)}`);
+    navigate(`/course/${toCourseId(course)}?from=mcq`);
 
   return (
     <ChartCard

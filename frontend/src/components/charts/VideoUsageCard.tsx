@@ -54,7 +54,7 @@ export default function VideoUsageCard() {
   );
 
   const openCourse = (course: string) =>
-    navigate(`/course/${toCourseId(course)}`);
+    navigate(`/course/${toCourseId(course)}?from=video`);
 
   // Always show toggle when there's more than one standard — even when total
   // equals TOP_N_DEFAULT, the two views differ in sort order (by usage vs by

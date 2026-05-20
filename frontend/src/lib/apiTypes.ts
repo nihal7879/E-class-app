@@ -143,6 +143,7 @@ export interface ChapterBreakdownItem {
   videoWatchMs: number;
   contents: number;
   students: number;
+  mcqAttempts: number;
 }
 export interface SubjectDetailResponse {
   subject: string;

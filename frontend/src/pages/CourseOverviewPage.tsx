@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useCourseDetail, useCourseSchools, useCourseSubjects } from "@/lib/hooks";
 import {
   courseFromId,
@@ -60,9 +60,17 @@ function colorForPct(pct: number): string {
   return "#dc2626";
 }
 
+type FocusMode = "video" | "mcq" | "all";
+
 export default function CourseOverviewPage() {
   const { courseId } = useParams<{ courseId: string }>();
   const course = courseId ? courseFromId(courseId) : "";
+  const [searchParams] = useSearchParams();
+  const fromParam = searchParams.get("from");
+  const focus: FocusMode =
+    fromParam === "video" ? "video" : fromParam === "mcq" ? "mcq" : "all";
+  const showVideo = focus !== "mcq";
+  const showMcq = focus !== "video";
 
   const detailApi = useCourseDetail(course || undefined);
   const subjectsApi = useCourseSubjects(course || undefined);
@@ -186,38 +194,57 @@ export default function CourseOverviewPage() {
               value={formatNumber(data.totalSubjects)}
               tone="emerald"
             />
-            <StatTile
-              label="Video views"
-              value={formatNumber(data.videoViews)}
-              tone="amber"
-            />
-            <StatTile
-              label="Watch time"
-              value={formatHours(data.videoDurationMs)}
-              tone="amber"
-            />
-            <StatTile
-              label="Avg MCQ"
-              value={
-                data.mcqAttempts > 0
-                  ? `${data.avgMcqPercentage.toFixed(0)}%`
-                  : "—"
-              }
-              tone="rose"
-              accent={
-                data.mcqAttempts > 0
-                  ? colorForPct(data.avgMcqPercentage)
-                  : undefined
-              }
-            />
+            {showVideo && (
+              <StatTile
+                label="Video views"
+                value={formatNumber(data.videoViews)}
+                tone="amber"
+              />
+            )}
+            {showVideo && (
+              <StatTile
+                label="Watch time"
+                value={formatHours(data.videoDurationMs)}
+                tone="amber"
+              />
+            )}
+            {showMcq && (
+              <StatTile
+                label="Avg MCQ"
+                value={
+                  data.mcqAttempts > 0
+                    ? `${data.avgMcqPercentage.toFixed(0)}%`
+                    : "—"
+                }
+                tone="rose"
+                accent={
+                  data.mcqAttempts > 0
+                    ? colorForPct(data.avgMcqPercentage)
+                    : undefined
+                }
+              />
+            )}
+            {focus === "mcq" && (
+              <StatTile
+                label="MCQ attempts"
+                value={formatNumber(data.mcqAttempts)}
+                tone="indigo"
+              />
+            )}
           </section>
 
           <div>
             <SectionHeader
               title="Subjects in this standard"
-              description="Across all schools — sorted by combined video + MCQ activity."
+              description={
+                focus === "video"
+                  ? "Across all schools — sorted by video activity."
+                  : focus === "mcq"
+                    ? "Across all schools — sorted by MCQ activity."
+                    : "Across all schools — sorted by combined video + MCQ activity."
+              }
             />
-            <SubjectTable subjects={subjects} />
+            <SubjectTable subjects={subjects} focus={focus} />
           </div>
 
           <div>
@@ -225,7 +252,7 @@ export default function CourseOverviewPage() {
               title="Schools using this standard"
               description="Where this standard is being consumed — click a school to drill into its students."
             />
-            <SchoolTable course={course} schools={schools} />
+            <SchoolTable course={course} schools={schools} focus={focus} />
           </div>
         </>
       )}
@@ -237,9 +264,13 @@ export default function CourseOverviewPage() {
 
 function SubjectTable({
   subjects,
+  focus,
 }: {
   subjects: CourseOverviewSubject[];
+  focus: FocusMode;
 }) {
+  const showVideo = focus !== "mcq";
+  const showMcq = focus !== "video";
   // Default order: natural by subject name (1, 2, … 10, then non-numeric).
   const [sortKey, setSortKey] = useState<SubjectSortKey>("subject");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -325,30 +356,38 @@ function SubjectTable({
                 dir={sortDir}
                 onClick={() => setSort("chapters")}
               />
-              <Th
-                label="Video views"
-                active={sortKey === "videoViews"}
-                dir={sortDir}
-                onClick={() => setSort("videoViews")}
-              />
-              <Th
-                label="Watch time"
-                active={sortKey === "videoDurationMs"}
-                dir={sortDir}
-                onClick={() => setSort("videoDurationMs")}
-              />
-              <Th
-                label="MCQ attempts"
-                active={sortKey === "mcqAttempts"}
-                dir={sortDir}
-                onClick={() => setSort("mcqAttempts")}
-              />
-              <Th
-                label="Avg score"
-                active={sortKey === "avgMcqPercentage"}
-                dir={sortDir}
-                onClick={() => setSort("avgMcqPercentage")}
-              />
+              {showVideo && (
+                <Th
+                  label="Video views"
+                  active={sortKey === "videoViews"}
+                  dir={sortDir}
+                  onClick={() => setSort("videoViews")}
+                />
+              )}
+              {showVideo && (
+                <Th
+                  label="Watch time"
+                  active={sortKey === "videoDurationMs"}
+                  dir={sortDir}
+                  onClick={() => setSort("videoDurationMs")}
+                />
+              )}
+              {showMcq && (
+                <Th
+                  label="MCQ attempts"
+                  active={sortKey === "mcqAttempts"}
+                  dir={sortDir}
+                  onClick={() => setSort("mcqAttempts")}
+                />
+              )}
+              {showMcq && (
+                <Th
+                  label="Avg score"
+                  active={sortKey === "avgMcqPercentage"}
+                  dir={sortDir}
+                  onClick={() => setSort("avgMcqPercentage")}
+                />
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -359,22 +398,24 @@ function SubjectTable({
                 </td>
                 <NumCell value={formatNumber(s.students)} />
                 <NumCell value={formatNumber(s.chapters)} />
-                <NumCell value={formatNumber(s.videoViews)} />
-                <NumCell value={formatHours(s.videoDurationMs)} />
-                <NumCell value={formatNumber(s.mcqAttempts)} />
-                <td
-                  className="num px-4 py-2.5 text-right font-semibold"
-                  style={{
-                    color:
-                      s.mcqAttempts > 0
-                        ? colorForPct(s.avgMcqPercentage)
-                        : "#94a3b8",
-                  }}
-                >
-                  {s.mcqAttempts > 0
-                    ? `${s.avgMcqPercentage.toFixed(0)}%`
-                    : "—"}
-                </td>
+                {showVideo && <NumCell value={formatNumber(s.videoViews)} />}
+                {showVideo && <NumCell value={formatHours(s.videoDurationMs)} />}
+                {showMcq && <NumCell value={formatNumber(s.mcqAttempts)} />}
+                {showMcq && (
+                  <td
+                    className="num px-4 py-2.5 text-right font-semibold"
+                    style={{
+                      color:
+                        s.mcqAttempts > 0
+                          ? colorForPct(s.avgMcqPercentage)
+                          : "#94a3b8",
+                    }}
+                  >
+                    {s.mcqAttempts > 0
+                      ? `${s.avgMcqPercentage.toFixed(0)}%`
+                      : "—"}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -389,11 +430,17 @@ function SubjectTable({
 function SchoolTable({
   course,
   schools,
+  focus,
 }: {
   course: string;
   schools: CourseOverviewSchool[];
+  focus: FocusMode;
 }) {
-  const [sortKey, setSortKey] = useState<SchoolSortKey>("videoDurationMs");
+  const showVideo = focus !== "mcq";
+  const showMcq = focus !== "video";
+  const [sortKey, setSortKey] = useState<SchoolSortKey>(
+    focus === "mcq" ? "mcqAttempts" : "videoDurationMs",
+  );
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const sorted = useMemo(() => {
@@ -444,30 +491,38 @@ function SchoolTable({
                 dir={sortDir}
                 onClick={() => setSort("students")}
               />
-              <Th
-                label="Video views"
-                active={sortKey === "videoViews"}
-                dir={sortDir}
-                onClick={() => setSort("videoViews")}
-              />
-              <Th
-                label="Watch time"
-                active={sortKey === "videoDurationMs"}
-                dir={sortDir}
-                onClick={() => setSort("videoDurationMs")}
-              />
-              <Th
-                label="MCQ attempts"
-                active={sortKey === "mcqAttempts"}
-                dir={sortDir}
-                onClick={() => setSort("mcqAttempts")}
-              />
-              <Th
-                label="Avg score"
-                active={sortKey === "avgMcqPercentage"}
-                dir={sortDir}
-                onClick={() => setSort("avgMcqPercentage")}
-              />
+              {showVideo && (
+                <Th
+                  label="Video views"
+                  active={sortKey === "videoViews"}
+                  dir={sortDir}
+                  onClick={() => setSort("videoViews")}
+                />
+              )}
+              {showVideo && (
+                <Th
+                  label="Watch time"
+                  active={sortKey === "videoDurationMs"}
+                  dir={sortDir}
+                  onClick={() => setSort("videoDurationMs")}
+                />
+              )}
+              {showMcq && (
+                <Th
+                  label="MCQ attempts"
+                  active={sortKey === "mcqAttempts"}
+                  dir={sortDir}
+                  onClick={() => setSort("mcqAttempts")}
+                />
+              )}
+              {showMcq && (
+                <Th
+                  label="Avg score"
+                  active={sortKey === "avgMcqPercentage"}
+                  dir={sortDir}
+                  onClick={() => setSort("avgMcqPercentage")}
+                />
+              )}
               <th className="px-4 py-2.5 text-right">{" "}</th>
             </tr>
           </thead>
@@ -478,22 +533,24 @@ function SchoolTable({
                   {s.school}
                 </td>
                 <NumCell value={formatNumber(s.students)} />
-                <NumCell value={formatNumber(s.videoViews)} />
-                <NumCell value={formatHours(s.videoDurationMs)} />
-                <NumCell value={formatNumber(s.mcqAttempts)} />
-                <td
-                  className="num px-4 py-2.5 text-right font-semibold"
-                  style={{
-                    color:
-                      s.mcqAttempts > 0
-                        ? colorForPct(s.avgMcqPercentage)
-                        : "#94a3b8",
-                  }}
-                >
-                  {s.mcqAttempts > 0
-                    ? `${s.avgMcqPercentage.toFixed(0)}%`
-                    : "—"}
-                </td>
+                {showVideo && <NumCell value={formatNumber(s.videoViews)} />}
+                {showVideo && <NumCell value={formatHours(s.videoDurationMs)} />}
+                {showMcq && <NumCell value={formatNumber(s.mcqAttempts)} />}
+                {showMcq && (
+                  <td
+                    className="num px-4 py-2.5 text-right font-semibold"
+                    style={{
+                      color:
+                        s.mcqAttempts > 0
+                          ? colorForPct(s.avgMcqPercentage)
+                          : "#94a3b8",
+                    }}
+                  >
+                    {s.mcqAttempts > 0
+                      ? `${s.avgMcqPercentage.toFixed(0)}%`
+                      : "—"}
+                  </td>
+                )}
                 <td className="px-4 py-2.5 text-right">
                   <Link
                     to={`/school/${toSchoolId(s.school)}/course/${encodeURIComponent(course)}`}

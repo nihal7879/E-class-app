@@ -94,7 +94,7 @@ export default function SubjectDetailPage() {
       contentItems: c.contents,
       videoViews: c.videoViews,
       videoDurationMs: c.videoWatchMs,
-      mcqAttempts: 0,
+      mcqAttempts: c.mcqAttempts ?? 0,
     }));
     const students: SubjectStudentStat[] = (studentsApi.data?.items ?? []).map((s) => ({
       userId: s.userId,
