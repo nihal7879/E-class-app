@@ -15,7 +15,6 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
-  const [keepSignedIn, setKeepSignedIn] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,21 +29,20 @@ export default function LoginPage() {
     let cycleId: number | undefined;
     let swapTimeout: number | undefined;
     let returnTimeout: number | undefined;
-    // First load: the sub-image (card) appears alone with the heading, then
-    // after a clear pause the chips fly in.
-    const firstFlyIn = window.setTimeout(() => setChipsAtCard(true), 2400);
+    // First load: card appears under the heading, then chips fly in 120ms apart.
+    const firstFlyIn = window.setTimeout(() => setChipsAtCard(true), 1800);
 
-    // Each cycle: chips fly out → card swaps and sits alone briefly → chips fly back in.
+    // ~5s loop: chips idle ~1s → fly out → card morph → chips fly back in.
     const tick = () => {
-      setChipsAtCard(false); // fly out (1300ms)
+      setChipsAtCard(false); // fly out (850ms transition)
       swapTimeout = window.setTimeout(() => {
-        setCardIndex((i) => (i === 0 ? 1 : 0)); // crossfade cards
-      }, 1300);
+        setCardIndex((i) => (i === 0 ? 1 : 0));
+      }, 700);
       returnTimeout = window.setTimeout(() => {
-        setChipsAtCard(true); // chips fly in to new card after a solo beat
-      }, 3300);
+        setChipsAtCard(true);
+      }, 1700);
     };
-    cycleId = window.setInterval(tick, 9000);
+    cycleId = window.setInterval(tick, 5000);
 
     return () => {
       window.clearTimeout(firstFlyIn);
@@ -110,10 +108,10 @@ export default function LoginPage() {
 
       {/* ============== LEFT BRAND PANEL ============== */}
       <aside className="relative hidden w-1/2 animate-slideInLeft flex-col overflow-hidden text-white lg:flex lg:px-10 lg:py-8">
-        {/* Brand mark — text + image fade in together */}
+        {/* Logo fades up first */}
         <div
           className="relative z-10 flex items-center gap-3 animate-slideInLeft"
-          style={{ animationDelay: "400ms" }}
+          style={{ animationDelay: "700ms" }}
         >
           <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/30 backdrop-blur-md">
             <BoltIcon />
@@ -126,13 +124,20 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Headline — fades up together with the brand and image */}
-        <div className="relative z-10 mt-7 max-w-md animate-slideInLeft" style={{ animationDelay: "400ms" }}>
-          <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-white/80 ring-1 ring-white/20 backdrop-blur">
+        {/* Education Intelligence badge */}
+        <div className="relative z-10 mt-7 max-w-md">
+          <span
+            className="inline-flex animate-slideInLeft items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-white/80 ring-1 ring-white/20 backdrop-blur"
+            style={{ animationDelay: "820ms" }}
+          >
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulseDot" />
             Education Intelligence
           </span>
-          <h1 className="mt-4 text-[32px] font-bold leading-[1.08] tracking-tight">
+          {/* Headline */}
+          <h1
+            className="mt-4 animate-slideInLeft text-[32px] font-bold leading-[1.08] tracking-tight"
+            style={{ animationDelay: "940ms" }}
+          >
             Unlock the full power of{" "}
             <span
               className="bg-clip-text text-transparent"
@@ -146,16 +151,20 @@ export default function LoginPage() {
               your classroom
             </span>
           </h1>
-          <p className="mt-3 max-w-[420px] text-[13px] leading-relaxed text-white/75">
+          {/* Subtitle */}
+          <p
+            className="mt-3 max-w-[420px] animate-slideInLeft text-[13px] leading-relaxed text-white/75"
+            style={{ animationDelay: "1060ms" }}
+          >
             Sign in to track learning across schools, standards, and subjects —
             unified for instructors and institute leaders.
           </p>
         </div>
 
-        {/* Card stage — animates in at the same time as the text */}
+        {/* Card stage — first card slides up after the subtitle */}
         <div
           className="relative z-10 mt-6 flex-1 animate-slideInLeft"
-          style={{ animationDelay: "400ms" }}
+          style={{ animationDelay: "1200ms" }}
         >
           <CardStage cardIndex={cardIndex} chipsAtCard={chipsAtCard} />
         </div>
@@ -163,18 +172,18 @@ export default function LoginPage() {
         {/* Footer copyright */}
         <div
           className="relative z-10 mt-4 flex animate-slideInLeft justify-end text-[10px] uppercase tracking-[0.15em] text-white/35"
-          style={{ animationDelay: "400ms" }}
+          style={{ animationDelay: "1400ms" }}
         >
           © 2026 E-class Analytics
         </div>
       </aside>
 
-      {/* ============== RIGHT FORM PANEL — floating card on dark theme ============== */}
+      {/* ============== RIGHT FORM PANEL ============== */}
       <main
         ref={formPanelRef}
         onMouseMove={handleMove}
         onMouseLeave={() => setPointer(null)}
-        className="relative flex w-full animate-slideInRight items-center justify-center overflow-hidden px-4 py-6 sm:px-6 lg:w-1/2"
+        className="relative flex w-full animate-slideInRight items-center justify-center overflow-hidden bg-[#f4f6fb] px-4 py-6 sm:px-6 lg:w-1/2"
         style={{ animationDelay: "500ms" }}
       >
         {/* Top loader sweep */}
@@ -187,7 +196,21 @@ export default function LoginPage() {
           />
         </div>
 
-        {/* Cursor spotlight (subtle, on dark) */}
+        {/* Decorative blobs */}
+        <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-accent-200/40 blur-[90px] animate-orbDriftAlt" />
+        <div className="pointer-events-none absolute -bottom-24 -right-16 h-80 w-80 rounded-full bg-fuchsia-200/40 blur-[100px] animate-orbDrift" />
+
+        {/* Dot grid + cursor spotlight */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-50"
+          style={{
+            backgroundImage:
+              "radial-gradient(rgba(99,102,241,0.18) 1px, transparent 1px)",
+            backgroundSize: "22px 22px",
+            maskImage:
+              "radial-gradient(ellipse at center, black 30%, transparent 75%)",
+          }}
+        />
         {pointer && (
           <div
             className="pointer-events-none absolute h-[420px] w-[420px] rounded-full transition-opacity duration-200"
@@ -195,14 +218,13 @@ export default function LoginPage() {
               left: pointer.x - 210,
               top: pointer.y - 210,
               background:
-                "radial-gradient(circle, rgba(140,170,255,0.16) 0%, rgba(140,170,255,0) 65%)",
+                "radial-gradient(circle, rgba(94,138,255,0.18) 0%, rgba(94,138,255,0) 65%)",
               filter: "blur(8px)",
             }}
           />
         )}
 
-        {/* Floating login card */}
-        <div className="relative z-10 w-full max-w-[420px] rounded-[28px] border border-white/10 bg-white p-7 shadow-[0_40px_80px_-30px_rgba(0,0,0,0.7),0_18px_36px_-16px_rgba(0,0,0,0.55)] ring-1 ring-black/[0.03]">
+        <div className="relative z-10 w-full max-w-[420px]">
           {/* Mobile logo */}
           <div className="mb-5 flex items-center gap-2 lg:hidden">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent-400 to-accent-600 text-white shadow-md shadow-accent-500/30">
@@ -283,19 +305,7 @@ export default function LoginPage() {
 
             {/* Password */}
             <div className="animate-slideInRight" style={{ animationDelay: "960ms" }}>
-              <div className="mb-1.5 flex items-center justify-between">
-                <FieldLabel htmlFor="password" inline>
-                  Password
-                </FieldLabel>
-                <a
-                  href="#"
-                  onClick={(e) => e.preventDefault()}
-                  className="text-[11px] font-medium transition hover:underline"
-                  style={{ color: BRAND }}
-                >
-                  Forgot password?
-                </a>
-              </div>
+              <FieldLabel htmlFor="password">Password</FieldLabel>
               <div className="relative">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                   <LockIcon />
@@ -321,20 +331,6 @@ export default function LoginPage() {
                 </button>
               </div>
             </div>
-
-            {/* Keep me signed in */}
-            <label
-              className="flex animate-slideInRight cursor-pointer select-none items-center gap-2 text-[12.5px] text-slate-700"
-              style={{ animationDelay: "1060ms" }}
-            >
-              <input
-                type="checkbox"
-                checked={keepSignedIn}
-                onChange={(e) => setKeepSignedIn(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-accent-600 accent-accent-600 focus:ring-accent-300"
-              />
-              Keep me signed in
-            </label>
 
             {error && (
               <div className="animate-fadeIn rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-[12px] font-medium text-rose-700">
@@ -370,9 +366,19 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p
-            className="mt-4 animate-slideInRight text-center text-[11.5px] text-slate-500"
+          {/* Trust badge pills */}
+          <div
+            className="mt-4 flex animate-slideInRight items-center justify-center gap-2"
             style={{ animationDelay: "1260ms" }}
+          >
+            <TrustBadge icon={<LockIcon small />} label="Encrypted" />
+            <TrustBadge icon={<ShieldIcon />} label="SSO ready" />
+            <TrustBadge icon={<AuditIcon />} label="Audit log" />
+          </div>
+
+          <p
+            className="mt-3 animate-slideInRight text-center text-[11.5px] text-slate-500"
+            style={{ animationDelay: "1360ms" }}
           >
             Need access?{" "}
             {selectedInstitute ? (
@@ -390,6 +396,15 @@ export default function LoginPage() {
 }
 
 /* ===================== Components ===================== */
+
+function TrustBadge({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[10.5px] font-medium text-slate-600 ring-1 ring-slate-200/70">
+      <span className="text-slate-400">{icon}</span>
+      {label}
+    </span>
+  );
+}
 
 function FieldLabel({
   htmlFor,
@@ -426,26 +441,28 @@ type ChipDef = {
   idle: { top?: string; left?: string; right?: string; bottom?: string };
   // Float animation while idle
   float: "animate-floatY" | "animate-floatYDelay" | "animate-floatYSlow";
+  // Stagger delay on the fly-in (120ms apart)
+  enterDelay: number;
 };
 
-// Idle positions sit at the card's four corners so the chips visibly cross /
-// overlap the sub-image edge — matching the Vertex reference flow.
 const CHIPS: ChipDef[] = [
   {
     label: "Schools",
     iconColor: "#4338ca",
-    icon: <SchoolIcon />,
+    icon: <DiamondIcon />,
     corner: "tl",
     idle: { top: "10%", left: "10%" },
     float: "animate-floatY",
+    enterDelay: 0,
   },
   {
     label: "Subjects",
     iconColor: "#7c3aed",
-    icon: <BookIcon />,
+    icon: <TabletIcon />,
     corner: "tr",
     idle: { top: "8%", right: "10%" },
     float: "animate-floatYDelay",
+    enterDelay: 120,
   },
   {
     label: "Standards",
@@ -454,6 +471,7 @@ const CHIPS: ChipDef[] = [
     corner: "bl",
     idle: { top: "55%", left: "6%" },
     float: "animate-floatYSlow",
+    enterDelay: 240,
   },
   {
     label: "Live Feed",
@@ -462,15 +480,16 @@ const CHIPS: ChipDef[] = [
     corner: "br",
     idle: { top: "50%", right: "8%" },
     float: "animate-floatY",
+    enterDelay: 360,
   },
 ];
 
-// Direction each chip flies toward its origin corner.
+// Direction each chip flies toward its origin corner. Scale 0.5 on exit per spec.
 const EXIT_TRANSFORMS: Record<CornerKey, string> = {
-  tl: "translate(-260%, -220%) scale(0.55)",
-  tr: "translate(260%, -220%) scale(0.55)",
-  bl: "translate(-260%, 220%) scale(0.55)",
-  br: "translate(260%, 220%) scale(0.55)",
+  tl: "translate(-260%, -220%) scale(0.5)",
+  tr: "translate(260%, -220%) scale(0.5)",
+  bl: "translate(-260%, 220%) scale(0.5)",
+  br: "translate(260%, 220%) scale(0.5)",
 };
 
 function CardStage({
@@ -480,19 +499,27 @@ function CardStage({
   cardIndex: number;
   chipsAtCard: boolean;
 }) {
+  // When cardIndex flips:
+  //   0 = AnalyticsCard alone at full size.
+  //   1 = AnalyticsCard shrinks and slots into the bottom-right of the
+  //       Performance Hub, which fades in around it as the bigger image.
+  const embeddedTransform =
+    "translate(22%, 34%) scale(0.42) rotate(-3deg)";
   return (
     <div className="relative h-full min-h-[280px] w-full">
-      {/* Card 0 — Course Performance bar chart */}
-      <CardLayer visible={cardIndex === 0}>
-        <CoursePerformanceCard />
-      </CardLayer>
+      {/* Performance Hub (the bigger image). Fades in behind AnalyticsCard. */}
+      <BackdropLayer visible={cardIndex === 1}>
+        <FullDashboardCard />
+      </BackdropLayer>
 
-      {/* Card 1 — Analytics dashboard (line + counters + horizontal bars) */}
-      <CardLayer visible={cardIndex === 1}>
-        <AnalyticsCard />
-      </CardLayer>
+      {/* Analytics card — always rendered. Morphs between full size and the
+          shrunken "embedded" overlay slot on top of the Performance Hub. */}
+      <MorphingAnalyticsLayer
+        embeddedTransform={embeddedTransform}
+        embedded={cardIndex === 1}
+      />
 
-      {/* Chips — same four, fly in from corners → idle floating → fly back */}
+      {/* Chips fly in from the four corners around the active composition */}
       {CHIPS.map((chip) => (
         <FlyingChip key={chip.label} chip={chip} visible={chipsAtCard} />
       ))}
@@ -500,7 +527,7 @@ function CardStage({
   );
 }
 
-function CardLayer({
+function BackdropLayer({
   visible,
   children,
 }: {
@@ -512,9 +539,10 @@ function CardLayer({
       className="absolute inset-0"
       style={{
         opacity: visible ? 1 : 0,
-        transform: visible ? "translateY(0)" : "translateY(18px)",
+        transform: visible ? "scale(1)" : "scale(0.94)",
+        transformOrigin: "50% 50%",
         transition:
-          "opacity 1100ms ease, transform 1100ms cubic-bezier(.2,.7,.2,1)",
+          "opacity 950ms ease, transform 950ms cubic-bezier(.4,.1,.2,1)",
         pointerEvents: visible ? "auto" : "none",
       }}
     >
@@ -523,10 +551,31 @@ function CardLayer({
   );
 }
 
+function MorphingAnalyticsLayer({
+  embeddedTransform,
+  embedded,
+}: {
+  embeddedTransform: string;
+  embedded: boolean;
+}) {
+  return (
+    <div
+      className="absolute inset-0 z-[5]"
+      style={{
+        transform: embedded ? embeddedTransform : "translate(0,0) scale(1)",
+        transformOrigin: "50% 50%",
+        transition: "transform 950ms cubic-bezier(.4,.1,.2,1)",
+      }}
+    >
+      <AnalyticsCard />
+    </div>
+  );
+}
+
 function FlyingChip({ chip, visible }: { chip: ChipDef; visible: boolean }) {
-  // When visible: at idle position (transform: none + float).
-  // When hidden: translated toward its corner + scaled down + faded.
   const exit = EXIT_TRANSFORMS[chip.corner];
+  // Stagger applies to entry (visible=true); exit fires simultaneously.
+  const delay = visible ? `${chip.enterDelay}ms` : "0ms";
   return (
     <div
       className="absolute z-20"
@@ -535,7 +584,8 @@ function FlyingChip({ chip, visible }: { chip: ChipDef; visible: boolean }) {
         transform: visible ? "translate(0,0) scale(1)" : exit,
         opacity: visible ? 1 : 0,
         transition:
-          "transform 1300ms cubic-bezier(.34,1.2,.4,1), opacity 1000ms ease",
+          "transform 850ms cubic-bezier(.34,1.4,.4,1), opacity 700ms ease",
+        transitionDelay: delay,
       }}
     >
       <div className={visible ? chip.float : undefined}>
@@ -553,70 +603,219 @@ function FlyingChip({ chip, visible }: { chip: ChipDef; visible: boolean }) {
   );
 }
 
-/* ----- Card 0: Course Performance ----- */
+/* ----- Card 1: Performance Hub — a fresh, distinct dashboard image ----- */
 
-function CoursePerformanceCard() {
-  const bars = [
-    { a: 50, b: 80 },
-    { a: 28, b: 44 },
-    { a: 38, b: 56 },
-    { a: 24, b: 30 },
+function FullDashboardCard() {
+  // Donut score
+  const score = 78;
+  const r = 18;
+  const c = 2 * Math.PI * r;
+  // Multi-bar weekly trend
+  const week = [
+    { d: "Mon", v: 62 },
+    { d: "Tue", v: 78 },
+    { d: "Wed", v: 54 },
+    { d: "Thu", v: 88 },
+    { d: "Fri", v: 72 },
+    { d: "Sat", v: 46 },
+    { d: "Sun", v: 64 },
   ];
-  const labels = ["Std 8", "Std 9", "Std 10", "Std 11"];
+  // Stacked bar segments
+  const stack = [
+    { label: "Maths", value: 32, color: BRAND },
+    { label: "Physics", value: 26, color: PURPLE },
+    { label: "Biology", value: 22, color: "#0ea5e9" },
+    { label: "Chem", value: 20, color: "#f59e0b" },
+  ];
   return (
-    <div className="absolute left-1/2 top-[14%] w-[86%] max-w-[440px] -translate-x-1/2 rounded-2xl bg-white p-4 text-slate-800 shadow-[0_30px_60px_-20px_rgba(0,0,0,0.45),0_12px_24px_-12px_rgba(0,0,0,0.3)]">
+    <div className="absolute left-1/2 top-[6%] w-[92%] max-w-[470px] -translate-x-1/2">
       <div className="animate-floatYDelay">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-100">
-              <ChartIcon />
-            </span>
-            <span className="text-[12px] font-semibold text-slate-900">
-              Course Performance
-            </span>
+        <div className="relative overflow-hidden rounded-2xl bg-white text-slate-800 shadow-[0_30px_60px_-20px_rgba(0,0,0,0.45),0_12px_24px_-12px_rgba(0,0,0,0.3)] ring-1 ring-black/[0.04]">
+          {/* Chrome bar */}
+          <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
+            <div className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-rose-400" />
+              <span className="h-2 w-2 rounded-full bg-amber-400" />
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              <span className="ml-2 text-[10px] font-semibold text-slate-700">
+                E-class · Performance Hub
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-400">
+              <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[8.5px] font-semibold text-slate-500">
+                ⌘K
+              </span>
+              <DotsIcon />
+            </div>
           </div>
-          <span className="text-slate-400">
-            <DotsIcon />
-          </span>
-        </div>
-        <div className="mt-3 flex items-end gap-3">
-          <div className="flex flex-1 items-end gap-3">
-            {bars.map((bar, i) => (
-              <div
-                key={i}
-                className="flex flex-1 flex-col items-center gap-1.5"
-              >
-                <div className="flex h-[80px] w-full items-end gap-1">
-                  <div
-                    className="flex-1 rounded-sm bg-slate-800"
-                    style={{ height: `${bar.a}%` }}
-                  />
-                  <div
-                    className="flex-1 rounded-sm"
-                    style={{ height: `${bar.b}%`, backgroundColor: BRAND }}
-                  />
+
+          <div className="flex">
+            {/* Sidebar */}
+            <div className="flex w-[40px] flex-col items-center gap-2 border-r border-slate-100 py-3">
+              <span className="flex h-6 w-6 items-center justify-center rounded-md bg-indigo-100 text-indigo-700">
+                <ChartIcon />
+              </span>
+              <span className="flex h-6 w-6 items-center justify-center rounded-md text-slate-400">
+                <BookIcon />
+              </span>
+              <span className="flex h-6 w-6 items-center justify-center rounded-md text-slate-400">
+                <StarIcon />
+              </span>
+              <span className="flex h-6 w-6 items-center justify-center rounded-md text-slate-400">
+                <PlayIcon />
+              </span>
+            </div>
+
+            <div className="flex-1 px-3 py-2.5">
+              {/* Top section: donut + KPI stack */}
+              <div className="flex items-center gap-3">
+                <div className="relative flex h-[68px] w-[68px] shrink-0 items-center justify-center">
+                  <svg width="68" height="68" viewBox="0 0 48 48">
+                    <circle
+                      cx="24"
+                      cy="24"
+                      r={r}
+                      fill="none"
+                      stroke="#e2e8f0"
+                      strokeWidth="6"
+                    />
+                    <circle
+                      cx="24"
+                      cy="24"
+                      r={r}
+                      fill="none"
+                      stroke={BRAND}
+                      strokeWidth="6"
+                      strokeLinecap="round"
+                      strokeDasharray={c}
+                      strokeDashoffset={c * (1 - score / 100)}
+                      transform="rotate(-90 24 24)"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
+                    <span className="text-[14px] font-bold text-slate-900">
+                      {score}%
+                    </span>
+                    <span className="mt-0.5 text-[7.5px] font-medium uppercase tracking-wide text-slate-500">
+                      Score
+                    </span>
+                  </div>
                 </div>
-                <div className="truncate text-[9px] font-medium text-slate-500">
-                  {labels[i]}
+
+                <div className="grid flex-1 grid-cols-2 gap-1.5">
+                  <KpiPill label="Users" value="2.4K" trend="+12%" />
+                  <KpiPill label="Watch" value="612h" trend="+8%" />
+                  <KpiPill label="MCQ" value="78%" trend="+4%" />
+                  <KpiPill label="Live" value="312" trend="now" trendColor={BRAND} />
                 </div>
               </div>
-            ))}
-          </div>
-          <div className="ml-2 flex flex-col gap-1.5 text-[10px]">
-            <LegendRow color={BRAND} label="Watch hrs" value="612" />
-            <LegendRow color="#0f172a" label="MCQ avg" value="78%" />
-            <LegendRow color="#94a3b8" label="Attempts" value="9.1K" />
+
+              {/* Multi-bar weekly trend */}
+              <div className="mt-3 rounded-lg border border-slate-200/60 p-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9.5px] font-semibold text-slate-700">
+                    Weekly Engagement
+                  </span>
+                  <span className="text-[8.5px] font-semibold text-emerald-600">
+                    ↗ +12%
+                  </span>
+                </div>
+                <div className="mt-1.5 flex h-[36px] items-end gap-1.5">
+                  {week.map((d, i) => (
+                    <div key={d.d} className="flex flex-1 flex-col items-center gap-1">
+                      <div className="flex h-[28px] w-full items-end">
+                        <div
+                          className="w-full rounded-sm"
+                          style={{
+                            height: `${d.v}%`,
+                            backgroundColor: i === 3 ? PURPLE : BRAND,
+                            opacity: i === 3 ? 1 : 0.7,
+                          }}
+                        />
+                      </div>
+                      <span className="text-[7.5px] font-medium text-slate-400">
+                        {d.d}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Stacked subject bar */}
+              <div className="mt-2.5">
+                <div className="flex items-center justify-between text-[9px] text-slate-600">
+                  <span className="font-semibold text-slate-700">
+                    Subject Mix
+                  </span>
+                  <span className="font-medium text-slate-400">
+                    {stack.reduce((s, x) => s + x.value, 0)}h total
+                  </span>
+                </div>
+                <div className="mt-1 flex h-2 w-full overflow-hidden rounded-full">
+                  {stack.map((s) => (
+                    <div
+                      key={s.label}
+                      style={{
+                        width: `${s.value}%`,
+                        backgroundColor: s.color,
+                      }}
+                    />
+                  ))}
+                </div>
+                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[8.5px] text-slate-600">
+                  {stack.map((s) => (
+                    <span key={s.label} className="inline-flex items-center gap-1">
+                      <span
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ backgroundColor: s.color }}
+                      />
+                      {s.label} {s.value}%
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        <div className="absolute -bottom-3 right-10">
+
+        {/* Live pill (left side, doesn't collide with the embedded Analytics) */}
+        <div className="absolute -bottom-3 left-8">
           <div
             className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10.5px] font-semibold text-white shadow-md"
-            style={{ backgroundColor: BRAND }}
+            style={{ backgroundColor: PURPLE }}
           >
             <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulseDot" />
-            Live · 42 students
+            Live · 312 online
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function KpiPill({
+  label,
+  value,
+  trend,
+  trendColor = "#16a34a",
+}: {
+  label: string;
+  value: string;
+  trend: string;
+  trendColor?: string;
+}) {
+  return (
+    <div className="rounded-md bg-slate-50 px-1.5 py-1">
+      <div className="text-[7.5px] font-medium uppercase tracking-wide text-slate-500">
+        {label}
+      </div>
+      <div className="mt-0.5 flex items-baseline gap-1">
+        <span className="text-[11.5px] font-bold leading-none text-slate-900">
+          {value}
+        </span>
+        <span className="text-[7.5px] font-semibold" style={{ color: trendColor }}>
+          {trend}
+        </span>
       </div>
     </div>
   );
@@ -865,6 +1064,38 @@ function StarIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
       <polygon points="12,2 15,9 22,9.3 17,14 18.5,21 12,17.5 5.5,21 7,14 2,9.3 9,9" />
+    </svg>
+  );
+}
+function DiamondIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2 22 12 12 22 2 12Z" />
+    </svg>
+  );
+}
+function TabletIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="2" width="16" height="20" rx="2.5" />
+      <line x1="12" y1="18" x2="12" y2="18.01" />
+    </svg>
+  );
+}
+function ShieldIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  );
+}
+function AuditIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="9" y1="13" x2="15" y2="13" />
+      <line x1="9" y1="17" x2="13" y2="17" />
     </svg>
   );
 }
