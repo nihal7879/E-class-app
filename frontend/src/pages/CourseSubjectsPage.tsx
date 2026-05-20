@@ -24,6 +24,8 @@ export default function CourseSubjectsPage() {
   const course = cId ? courseFromId(cId) : "";
   const [searchParams] = useSearchParams();
   const backFromCourse = searchParams.get("back") === "course";
+  const fromParam = searchParams.get("from");
+  const focusSuffix = fromParam === "video" || fromParam === "mcq" ? `?from=${fromParam}` : "";
   const { setFilter } = useFilter();
   const navigate = useNavigate();
 
@@ -58,7 +60,7 @@ export default function CourseSubjectsPage() {
   );
 
   const coursesHref = backFromCourse && course
-    ? `/course/${toCourseId(course)}`
+    ? `/course/${toCourseId(course)}${focusSuffix}`
     : school
       ? `/school/${toSchoolId(school)}/courses`
       : "/dashboard";
