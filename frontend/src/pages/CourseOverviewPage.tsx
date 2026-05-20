@@ -553,7 +553,7 @@ function SchoolTable({
                 )}
                 <td className="px-4 py-2.5 text-right">
                   <Link
-                    to={`/school/${toSchoolId(s.school)}/course/${encodeURIComponent(course)}`}
+                    to={`/school/${toSchoolId(s.school)}/course/${encodeURIComponent(course)}?back=course`}
                     className="inline-flex items-center gap-1 text-[12px] font-medium text-accent-600 transition hover:text-accent-700"
                   >
                     Open

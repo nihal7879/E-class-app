@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useCourseSubjects } from "@/lib/hooks";
 import { useFilter } from "@/lib/filterContext";
 import {
@@ -22,7 +22,10 @@ export default function CourseSubjectsPage() {
   }>();
   const school = sId ? schoolFromId(sId) : "";
   const course = cId ? courseFromId(cId) : "";
+  const [searchParams] = useSearchParams();
+  const backFromCourse = searchParams.get("back") === "course";
   const { setFilter } = useFilter();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!school) return;
@@ -54,7 +57,12 @@ export default function CourseSubjectsPage() {
     [data],
   );
 
-  const coursesHref = school ? `/school/${toSchoolId(school)}/courses` : "/dashboard";
+  const coursesHref = backFromCourse && course
+    ? `/course/${toCourseId(course)}`
+    : school
+      ? `/school/${toSchoolId(school)}/courses`
+      : "/dashboard";
+  const backLabel = backFromCourse ? "Back to standard" : "Back to courses";
 
   return (
     <div className="space-y-6 pb-12">
@@ -63,10 +71,17 @@ export default function CourseSubjectsPage() {
           <div className="min-w-0">
             <Link
               to={coursesHref}
+              onClick={(e) => {
+                if (backFromCourse) {
+                  e.preventDefault();
+                  setFilter((f) => ({ ...f, schools: [] }));
+                  navigate(coursesHref);
+                }
+              }}
               className="inline-flex items-center gap-1 text-[12px] font-medium text-slate-500 transition hover:text-accent-600"
             >
               <ArrowLeftIcon />
-              Back to courses
+              {backLabel}
             </Link>
             <div className="mt-1 text-[12px] font-medium text-slate-500">
               {school || "Unknown school"} · Course
