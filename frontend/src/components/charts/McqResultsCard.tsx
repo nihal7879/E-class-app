@@ -178,7 +178,7 @@ export default function McqResultsCard() {
               <ResponsiveContainer>
                 <BarChart
                   data={overview.scoreDistribution}
-                  margin={{ top: 4, right: 8, bottom: 4, left: -16 }}
+                  margin={{ top: 4, right: 8, bottom: 4, left: 0 }}
                 >
                   <CartesianGrid
                     stroke={GRID_COLOR}
@@ -198,7 +198,7 @@ export default function McqResultsCard() {
                     tickLine={false}
                     axisLine={false}
                     allowDecimals={false}
-                    width={32}
+                    width={40}
                   />
                   <Tooltip
                     cursor={{ fill: "#f1f5f9" }}

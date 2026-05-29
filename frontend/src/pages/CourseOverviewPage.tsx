@@ -70,7 +70,6 @@ export default function CourseOverviewPage() {
   const focus: FocusMode =
     fromParam === "video" ? "video" : fromParam === "mcq" ? "mcq" : "all";
   const showVideo = focus !== "mcq";
-  const showMcq = focus !== "video";
 
   const detailApi = useCourseDetail(course || undefined);
   const subjectsApi = useCourseSubjects(course || undefined);
@@ -206,22 +205,6 @@ export default function CourseOverviewPage() {
                 label="Watch time"
                 value={formatHours(data.videoDurationMs)}
                 tone="amber"
-              />
-            )}
-            {showMcq && (
-              <StatTile
-                label="Avg MCQ"
-                value={
-                  data.mcqAttempts > 0
-                    ? `${data.avgMcqPercentage.toFixed(0)}%`
-                    : "—"
-                }
-                tone="rose"
-                accent={
-                  data.mcqAttempts > 0
-                    ? colorForPct(data.avgMcqPercentage)
-                    : undefined
-                }
               />
             )}
             {focus === "mcq" && (
