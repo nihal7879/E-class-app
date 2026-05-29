@@ -15,7 +15,7 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
       <Topbar />
       <main
         ref={mainRef}
-        className="flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6"
+        className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6"
       >
         <div className="mx-auto w-full max-w-[1500px]">{children}</div>
       </main>

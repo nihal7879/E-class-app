@@ -132,21 +132,27 @@ export default function McqResultsCard() {
               value={`${overview.avgPercentage.toFixed(0)}%`}
               tone="rose"
               accent={colorForPct(overview.avgPercentage)}
+              info="Average score across every attempt in the current filter — the mean of each attempt's stored percentage. Weighted by attempts, not per student."
             />
             <Stat
               label="Attempts"
               value={formatNumber(overview.totalAttempts)}
               tone="indigo"
+              info="Total number of MCQ attempts matching the current filter."
             />
             <Stat
               label="Students"
               value={formatNumber(overview.uniqueStudents)}
               tone="violet"
+              info="Distinct students who made at least one attempt in the current filter."
+              infoAlign="right"
             />
             <Stat
               label="Avg time"
               value={formatTime(overview.avgTimeSpentMs)}
               tone="emerald"
+              info="Average time spent per attempt across the current filter."
+              infoAlign="right"
             />
           </div>
 
@@ -171,8 +177,11 @@ export default function McqResultsCard() {
           </div>
 
           <div>
-            <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              Score distribution (all attempts)
+            <div className="mb-1.5 flex items-center gap-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Score distribution (all attempts)
+              </span>
+              <InfoTip text="Every attempt is placed in one of five score bands (0–20% … 80–100%) by its percentage. Each bar's height is the number of attempts in that band, so the five bars together equal all attempts in the current filter." />
             </div>
             <div className="h-[140px]">
               <ResponsiveContainer>
@@ -312,22 +321,29 @@ function Stat({
   value,
   tone,
   accent,
+  info,
+  infoAlign,
 }: {
   label: string;
   value: string;
   tone: keyof typeof STAT_TONES;
   accent?: string;
+  info?: string; // hover explanation of how the figure is calculated
+  infoAlign?: "left" | "right"; // which edge the tooltip opens from
 }) {
   return (
     <div className="flex flex-col rounded-xl border border-slate-100 bg-white px-3 py-3 sm:px-3.5 sm:py-3.5">
-      <span
-        className={
-          "inline-flex w-fit items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1 " +
-          STAT_TONES[tone]
-        }
-      >
-        {label}
-      </span>
+      <div className="flex items-center justify-between gap-1">
+        <span
+          className={
+            "inline-flex w-fit items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1 " +
+            STAT_TONES[tone]
+          }
+        >
+          {label}
+        </span>
+        {info && <InfoTip text={info} align={infoAlign} />}
+      </div>
       <div
         className="num mt-3 text-[18px] font-bold leading-none"
         style={{ color: accent || "#0f172a" }}
@@ -335,6 +351,33 @@ function Stat({
         {value}
       </div>
     </div>
+  );
+}
+
+// Small "ⓘ" button with a hover/focus tooltip explaining how a metric is
+// calculated. Tooltip drops below the icon (the card has room). `align`
+// controls which edge it opens from so it never runs off the side of the card:
+// left-edge tiles open rightward ("left"), right-edge tiles open leftward ("right").
+function InfoTip({ text, align = "left" }: { text: string; align?: "left" | "right" }) {
+  return (
+    <span className="group/info relative inline-flex shrink-0">
+      <button
+        type="button"
+        aria-label="How this is calculated"
+        className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold leading-none text-slate-500 ring-1 ring-slate-200 transition hover:bg-slate-200 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-300"
+      >
+        i
+      </button>
+      <span
+        role="tooltip"
+        className={clsx(
+          "pointer-events-none absolute top-full z-40 mt-1.5 w-48 rounded-lg bg-slate-900 px-2.5 py-1.5 text-[11px] font-normal normal-case leading-snug text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover/info:opacity-100 group-focus-within/info:opacity-100",
+          align === "right" ? "right-0" : "left-0",
+        )}
+      >
+        {text}
+      </span>
+    </span>
   );
 }
 
