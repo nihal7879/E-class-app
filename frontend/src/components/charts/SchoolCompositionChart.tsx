@@ -9,7 +9,7 @@ import ChartCard from "./ChartCard";
 
 type SchoolCompositionStat = SchoolCompositionItem;
 
-const TOP_N_DEFAULT = 6;
+const TOP_N_DEFAULT = 10;
 
 type MetricKey = "logins" | "sessions" | "videoViews" | "mcqAttempts";
 type ViewMetric = "all" | MetricKey;

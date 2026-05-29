@@ -11,6 +11,7 @@ import type {
   SchoolCompositionResponse,
   SchoolCoursesResponse,
   SchoolDetailResponse,
+  SchoolSubjectsResponse,
   StudentsResponse,
   SubjectDetailResponse,
   SubjectStudentsResponse,
@@ -96,6 +97,9 @@ export const api = {
 
   schoolCourses: (school: string, f: FilterState) =>
     getJson<SchoolCoursesResponse>(`/api/schools/${encodeURIComponent(school)}/courses`, filterToParams(f)),
+
+  schoolSubjects: (school: string, f: FilterState) =>
+    getJson<SchoolSubjectsResponse>(`/api/schools/${encodeURIComponent(school)}/subjects`, filterToParams(f)),
 
   courseDetail: (course: string, f: FilterState) =>
     getJson<CourseDetailResponse>(`/api/courses/${encodeURIComponent(course)}`, filterToParams(f)),

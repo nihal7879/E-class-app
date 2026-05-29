@@ -81,6 +81,17 @@ export interface SchoolCoursesResponse {
   items: SchoolCourseItem[];
 }
 
+export interface SchoolSubjectItem {
+  subject: string;
+  watchMs: number;
+  views: number;
+  students: number;
+}
+export interface SchoolSubjectsResponse {
+  school: string;
+  items: SchoolSubjectItem[];
+}
+
 export interface CourseDetailResponse {
   course: string;
   videoViews: number;

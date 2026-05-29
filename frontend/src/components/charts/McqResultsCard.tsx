@@ -59,7 +59,11 @@ export default function McqResultsCard() {
   const navigate = useNavigate();
   const { data, loading, error, refetch } = useMcqOverview();
   const overview = data ?? EMPTY_OVERVIEW;
-  const [showAll, setShowAll] = useState(false);
+  // Default to showing ALL standards (ordered 1st → 10th). The score
+  // distribution below is labelled "all attempts", so a truncated Top-N list
+  // made the per-standard attempts appear not to add up to it (feedback #7).
+  // Showing all standards keeps the two views reconciled; the toggle remains.
+  const [showAll, setShowAll] = useState(true);
 
   const hasData = overview.totalAttempts > 0;
   const visibleCourses = useMemo(() => {

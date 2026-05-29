@@ -1,6 +1,11 @@
 import { useEffect, useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useDailyActivity, useSchoolCourses, useStudents } from "@/lib/hooks";
+import {
+  useDailyActivity,
+  useSchoolCourses,
+  useSchoolSubjects,
+  useStudents,
+} from "@/lib/hooks";
 import { useFilter } from "@/lib/filterContext";
 import { formatNumber, schoolFromId, schoolId as toSchoolId } from "@/lib/parse";
 import type { StudentStat } from "@/lib/types";
@@ -34,6 +39,7 @@ export default function SchoolDetailPage() {
   const studentsApi = useStudents({ sort: "sessionMs", limit: 1000, extra });
   const dailyApi = useDailyActivity(extra);
   const coursesApi = useSchoolCourses(school);
+  const subjectsApi = useSchoolSubjects(school);
 
   const students: StudentStat[] = useMemo(
     () =>
@@ -58,6 +64,12 @@ export default function SchoolDetailPage() {
     [dailyApi.data],
   );
   const courseCount = coursesApi.data?.items.length ?? 0;
+  // Top 5 subjects by video watch time (learning hours) for this school.
+  const topSubjects = useMemo(
+    () => (subjectsApi.data?.items ?? []).slice(0, 5),
+    [subjectsApi.data],
+  );
+  const subjectsLoading = subjectsApi.loading && !subjectsApi.data;
   const studentsLoading = studentsApi.loading && !studentsApi.data;
   const dailyLoading = dailyApi.loading && !dailyApi.data;
   const kpisLoading =
@@ -152,6 +164,14 @@ export default function SchoolDetailPage() {
 
       <div>
         <SectionHeader
+          title="Top subjects"
+          description="Most-watched subjects by learning hours in this school."
+        />
+        <TopSubjects subjects={topSubjects} loading={subjectsLoading} />
+      </div>
+
+      <div>
+        <SectionHeader
           title="Daily activity"
           description="Logins and active students per day for this school."
         />
@@ -193,11 +213,97 @@ export default function SchoolDetailPage() {
   );
 }
 
+// Top 5 subjects ranked by learning hours (video watch time) for the school.
+function TopSubjects({
+  subjects,
+  loading,
+}: {
+  subjects: { subject: string; watchMs: number; views: number; students: number }[];
+  loading: boolean;
+}) {
+  const maxMs = subjects.reduce((m, s) => Math.max(m, s.watchMs), 0);
+  const TONES = [
+    "from-indigo-500 to-indigo-600",
+    "from-violet-500 to-violet-600",
+    "from-emerald-500 to-emerald-600",
+    "from-amber-400 to-amber-500",
+    "from-rose-500 to-rose-600",
+  ];
+
+  if (loading) {
+    return (
+      <div className="card p-5">
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-9 animate-pulse rounded-lg bg-slate-100" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (subjects.length === 0) {
+    return (
+      <div className="card flex h-[140px] items-center justify-center p-5 text-center text-sm text-slate-400">
+        No subject video activity for this school in the selected period.
+      </div>
+    );
+  }
+
+  return (
+    <div className="card p-4 sm:p-5">
+      <ul className="space-y-2.5">
+        {subjects.map((s, i) => {
+          const hours = s.watchMs / 3_600_000;
+          const pct = maxMs > 0 ? Math.max(4, (s.watchMs / maxMs) * 100) : 0;
+          return (
+            <li
+              key={s.subject}
+              className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-slate-100 px-3 py-2.5"
+            >
+              <span
+                className={
+                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-[12px] font-bold text-white " +
+                  TONES[i % TONES.length]
+                }
+              >
+                {i + 1}
+              </span>
+              <div className="min-w-0">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="truncate text-[13px] font-semibold text-slate-900">
+                    {s.subject}
+                  </span>
+                  <span className="num shrink-0 text-[11px] text-slate-500">
+                    {formatNumber(s.views)} views · {formatNumber(s.students)} students
+                  </span>
+                </div>
+                <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className={"h-full rounded-full bg-gradient-to-r " + TONES[i % TONES.length]}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+              <span className="num shrink-0 text-right text-[13px] font-bold text-slate-800">
+                {hours >= 10 ? hours.toFixed(0) : hours.toFixed(1)}
+                <span className="ml-0.5 text-[10.5px] font-medium text-slate-400">
+                  hrs
+                </span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 function UsersIcon() {
   return (
     <svg
-      width="18"
-      height="18"
+      width="20"
+      height="20"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -214,8 +320,8 @@ function UsersIcon() {
 function KeyIcon() {
   return (
     <svg
-      width="18"
-      height="18"
+      width="20"
+      height="20"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -233,8 +339,8 @@ function KeyIcon() {
 function PlayIcon() {
   return (
     <svg
-      width="18"
-      height="18"
+      width="20"
+      height="20"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -249,8 +355,8 @@ function PlayIcon() {
 function ClockIcon() {
   return (
     <svg
-      width="18"
-      height="18"
+      width="20"
+      height="20"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -266,8 +372,8 @@ function ClockIcon() {
 function BookIcon() {
   return (
     <svg
-      width="18"
-      height="18"
+      width="20"
+      height="20"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"

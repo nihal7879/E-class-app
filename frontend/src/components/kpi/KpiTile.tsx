@@ -12,13 +12,55 @@ interface KpiTileProps {
 
 type ToneKey = "indigo" | "violet" | "emerald" | "amber" | "rose" | "slate";
 
-const TONES: Record<ToneKey, { iconBg: string; iconFg: string }> = {
-  indigo: { iconBg: "bg-indigo-100", iconFg: "text-indigo-600" },
-  violet: { iconBg: "bg-violet-100", iconFg: "text-violet-600" },
-  emerald: { iconBg: "bg-emerald-100", iconFg: "text-emerald-600" },
-  amber: { iconBg: "bg-amber-100", iconFg: "text-amber-600" },
-  rose: { iconBg: "bg-rose-100", iconFg: "text-rose-600" },
-  slate: { iconBg: "bg-slate-100", iconFg: "text-slate-600" },
+// Each tone carries a colour-washed card background, a gradient icon chip
+// (white glyph on a saturated gradient), a tinted top border and a coloured
+// value — so the strip reads as a row of distinct, vivid stat cards.
+const TONES: Record<
+  ToneKey,
+  { card: string; iconBg: string; iconFg: string; value: string; border: string }
+> = {
+  indigo: {
+    card: "bg-gradient-to-br from-indigo-50 to-white",
+    iconBg: "bg-gradient-to-br from-indigo-500 to-indigo-600 shadow-md shadow-indigo-500/30",
+    iconFg: "text-white",
+    value: "text-indigo-700",
+    border: "border-t-indigo-400",
+  },
+  violet: {
+    card: "bg-gradient-to-br from-violet-50 to-white",
+    iconBg: "bg-gradient-to-br from-violet-500 to-violet-600 shadow-md shadow-violet-500/30",
+    iconFg: "text-white",
+    value: "text-violet-700",
+    border: "border-t-violet-400",
+  },
+  emerald: {
+    card: "bg-gradient-to-br from-emerald-50 to-white",
+    iconBg: "bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-md shadow-emerald-500/30",
+    iconFg: "text-white",
+    value: "text-emerald-700",
+    border: "border-t-emerald-400",
+  },
+  amber: {
+    card: "bg-gradient-to-br from-amber-50 to-white",
+    iconBg: "bg-gradient-to-br from-amber-400 to-amber-500 shadow-md shadow-amber-500/30",
+    iconFg: "text-white",
+    value: "text-amber-700",
+    border: "border-t-amber-400",
+  },
+  rose: {
+    card: "bg-gradient-to-br from-rose-50 to-white",
+    iconBg: "bg-gradient-to-br from-rose-500 to-rose-600 shadow-md shadow-rose-500/30",
+    iconFg: "text-white",
+    value: "text-rose-700",
+    border: "border-t-rose-400",
+  },
+  slate: {
+    card: "bg-gradient-to-br from-slate-50 to-white",
+    iconBg: "bg-gradient-to-br from-slate-500 to-slate-600 shadow-md shadow-slate-500/30",
+    iconFg: "text-white",
+    value: "text-slate-700",
+    border: "border-t-slate-400",
+  },
 };
 
 export default function KpiTile({
@@ -31,11 +73,17 @@ export default function KpiTile({
 }: KpiTileProps) {
   const t = TONES[tone];
   return (
-    <div className="card card-hover group relative flex flex-col p-4 sm:p-5">
+    <div
+      className={clsx(
+        "card card-hover group relative flex flex-col border-t-[3px] p-4 sm:p-5",
+        t.card,
+        t.border,
+      )}
+    >
       <div className="flex items-start justify-between gap-2">
         <div
           className={clsx(
-            "flex h-9 w-9 items-center justify-center rounded-xl sm:h-10 sm:w-10",
+            "flex h-11 w-11 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-105 sm:h-12 sm:w-12",
             t.iconBg,
             t.iconFg,
           )}
@@ -50,7 +98,12 @@ export default function KpiTile({
       </div>
 
       <div className="mt-3 flex items-baseline gap-1.5 sm:mt-4">
-        <div className="num text-[24px] font-bold leading-none tracking-tight text-slate-900 sm:text-[30px]">
+        <div
+          className={clsx(
+            "num text-[24px] font-bold leading-none tracking-tight sm:text-[30px]",
+            t.value,
+          )}
+        >
           {value}
         </div>
         {unit && (

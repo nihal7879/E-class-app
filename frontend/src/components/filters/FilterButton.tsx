@@ -11,6 +11,13 @@ import { useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
 import { useCatalogue } from "@/lib/hooks";
 import { useFilter } from "@/lib/filterContext";
+import type { FilterState } from "@/lib/types";
+
+// A fully-cleared filter — used by "Reset all" inside the draft.
+const EMPTY_FILTER: FilterState = {
+  year: "all", month: "all", schools: [], courses: [],
+  divisions: [], genders: [],
+};
 
 const EMPTY_CAT = {
   years: [] as number[], months: [] as number[],
@@ -36,7 +43,7 @@ interface Pos {
 }
 
 export default function FilterButton() {
-  const { filter, setFilter, reset, hasActive } = useFilter();
+  const { filter, setFilter, hasActive } = useFilter();
   const loc = useLocation();
   const nav = useNavigate();
   const isSm = useIsSm();
@@ -50,6 +57,30 @@ export default function FilterButton() {
   const panelRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<Pos | null>(null);
 
+  // Draft selections. Edits in the popover update the draft only; nothing is
+  // applied (no refetch, no navigation) until the user clicks "Apply". This is
+  // feedback #1 — previously selecting a school took effect immediately.
+  const [draft, setDraft] = useState<FilterState>(filter);
+  // Re-sync the draft to the committed filter each time the popover opens, so a
+  // discarded edit doesn't linger and external changes (e.g. navigation) show.
+  useEffect(() => {
+    if (open) setDraft(filter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  const isDirty = JSON.stringify(draft) !== JSON.stringify(filter);
+
+  // Commit the draft to the shared filter (triggers the dashboard refetch),
+  // then mirror the old navigate-on-school behaviour and close the popover.
+  const applyDraft = () => {
+    setFilter(() => draft);
+    if (onDetail) {
+      if (draft.schools.length === 1) nav(`/school/${schoolId(draft.schools[0])}`);
+      else if (draft.schools.length === 0) nav("/dashboard");
+    }
+    setOpen(false);
+  };
+
+  // Badge + active styling reflect the COMMITTED filter, not the draft.
   const activeCount =
     filter.schools.length +
     filter.courses.length +
@@ -112,14 +143,7 @@ export default function FilterButton() {
   }, [open]);
 
   const handleSchoolChange = (next: string[]) => {
-    setFilter((f) => ({ ...f, schools: next }));
-    if (onDetail) {
-      if (next.length === 1) {
-        nav(`/school/${schoolId(next[0])}`);
-      } else if (next.length === 0) {
-        nav("/dashboard");
-      }
-    }
+    setDraft((f) => ({ ...f, schools: next }));
   };
 
   return (
@@ -193,10 +217,10 @@ export default function FilterButton() {
                   <DateRangeSection
                     minDate={available.minDate}
                     maxDate={available.maxDate}
-                    dateFrom={filter.dateFrom}
-                    dateTo={filter.dateTo}
+                    dateFrom={draft.dateFrom}
+                    dateTo={draft.dateTo}
                     onChange={(dateFrom, dateTo) =>
-                      setFilter((f) => ({ ...f, dateFrom, dateTo }))
+                      setDraft((f) => ({ ...f, dateFrom, dateTo }))
                     }
                   />
                 </div>
@@ -205,7 +229,7 @@ export default function FilterButton() {
                     <MultiSelect
                       label="School"
                       options={available.schools}
-                      value={filter.schools}
+                      value={draft.schools}
                       onChange={handleSchoolChange}
                       placeholder="All schools"
                       formatOption={(o) => shortSchoolName(o, 36)}
@@ -217,9 +241,9 @@ export default function FilterButton() {
                     <MultiSelect
                       label="Course"
                       options={courseOptions}
-                      value={filter.courses}
+                      value={draft.courses}
                       onChange={(next) =>
-                        setFilter((f) => ({ ...f, courses: next }))
+                        setDraft((f) => ({ ...f, courses: next }))
                       }
                       placeholder="All courses"
                       formatOption={formatCourseLabel}
@@ -229,14 +253,27 @@ export default function FilterButton() {
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/60 px-4 py-2.5">
+            <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/60 px-4 py-2.5">
               <button
                 type="button"
-                onClick={reset}
-                disabled={!hasActive}
+                onClick={() => setDraft(EMPTY_FILTER)}
+                disabled={
+                  draft.schools.length === 0 &&
+                  draft.courses.length === 0 &&
+                  !draft.dateFrom &&
+                  !draft.dateTo
+                }
                 className="text-xs font-medium text-slate-500 transition hover:text-accent-600 disabled:cursor-not-allowed disabled:text-slate-300"
               >
                 Reset all
+              </button>
+              <button
+                type="button"
+                onClick={applyDraft}
+                disabled={!isDirty}
+                className="inline-flex items-center gap-1.5 rounded-full bg-accent-600 px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-accent-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                Apply filters
               </button>
             </div>
           </div>,

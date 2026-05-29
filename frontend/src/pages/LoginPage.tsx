@@ -9,6 +9,8 @@ export default function LoginPage() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  // Where to go after a successful sign-in: the page RequireAuth bounced the
+  // user from (passed via router state), or the dashboard by default.
   const redirectTo = (location.state as { from?: string } | null)?.from ?? "/dashboard";
 
   const [instituteId, setInstituteId] = useState<string>("");
@@ -57,6 +59,8 @@ export default function LoginPage() {
     [instituteId],
   );
 
+  // If the user is already signed in (e.g. navigated to /login manually or
+  // rehydrated from localStorage), skip the form and redirect straight away.
   useEffect(() => {
     if (user) navigate(redirectTo, { replace: true });
   }, [user, redirectTo, navigate]);
@@ -66,6 +70,11 @@ export default function LoginPage() {
     setPointer({ x: e.clientX - rect.left, y: e.clientY - rect.top });
   };
 
+  // Submit handler: clears any prior error, flips the busy flag (disables the
+  // button + shows the spinner), then delegates to the context's `login`.
+  // On failure it surfaces the returned message inline; on success it routes to
+  // `redirectTo`. (The effect above would also redirect once `user` is set —
+  // this navigate just makes it immediate.)
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -959,16 +968,6 @@ function Counter({ label, value }: { label: string; value: string }) {
   );
 }
 
-function LegendRow({ color, label, value }: { color: string; label: string; value: string }) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
-      <span className="text-slate-500">{label}</span>
-      <span className="ml-auto font-semibold text-slate-700">{value}</span>
-    </div>
-  );
-}
-
 /* ===================== Icons ===================== */
 
 function BookIcon() {
@@ -979,26 +978,10 @@ function BookIcon() {
     </svg>
   );
 }
-function SchoolIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 3 2 8l10 5 10-5-10-5zm0 7L4 6.5v4.7c0 .3.2.6.5.7L12 16l7.5-4.1c.3-.1.5-.4.5-.7V6.5L12 10z" />
-    </svg>
-  );
-}
 function PlayIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
       <polygon points="6,4 20,12 6,20" />
-    </svg>
-  );
-}
-function QuizIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 3.5" />
-      <line x1="12" y1="17" x2="12" y2="17.01" />
     </svg>
   );
 }

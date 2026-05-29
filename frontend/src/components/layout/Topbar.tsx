@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { useCommandPalette } from "@/lib/commandPalette";
 import { useFilter } from "@/lib/filterContext";
-import { useAuth } from "@/lib/auth";
+// Login flow bypassed for now — useAuth/logout no longer needed here.
+// import { useAuth } from "@/lib/auth";
 import FilterButton from "@/components/filters/FilterButton";
 
 export default function Topbar() {
@@ -10,7 +11,7 @@ export default function Topbar() {
   const nav = useNavigate();
   const { setOpen: setPaletteOpen } = useCommandPalette();
   const { reset: resetFilter } = useFilter();
-  const { user, logout } = useAuth();
+  // const { logout } = useAuth();
   const onDetail = loc.pathname.startsWith("/school/");
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -26,24 +27,28 @@ export default function Topbar() {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [menuOpen]);
 
-  const initials = (user?.username ?? "")
-    .split(/[.\s_-]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((s) => s[0]?.toUpperCase() ?? "")
-    .join("") || "U";
+  // Hardcoded identity for now — show only "Nirav Mehta" / "Admin", no email or
+  // institute. To restore the logged-in user, swap these back to:
+  //   const displayName = user?.name ?? user?.username ?? "Guest";
+  //   const role = user?.role ?? "Admin";
+  const displayName = "Nirav Mehta";
+  const role = "Admin";
+  const initials = "NM";
 
   const handleBack = () => {
     resetFilter();
     nav("/dashboard");
   };
 
-  const handleLogout = () => {
-    setMenuOpen(false);
-    resetFilter();
-    logout();
-    nav("/login", { replace: true });
-  };
+  // Sign-out disabled while the login flow is bypassed. To restore, uncomment
+  // this and the useAuth import + logout destructure above, and the Sign out
+  // button in the menu below.
+  // const handleLogout = () => {
+  //   setMenuOpen(false);
+  //   resetFilter();
+  //   logout();
+  //   nav("/login", { replace: true });
+  // };
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 sm:px-6">
@@ -137,10 +142,10 @@ export default function Topbar() {
           >
             <div className="hidden text-right leading-tight md:block">
               <div className="text-[12.5px] font-semibold text-slate-900">
-                {user?.username ?? "Guest"}
+                {displayName}
               </div>
               <div className="truncate text-[11px] text-slate-500">
-                {user?.instituteName ?? "—"}
+                {role}
               </div>
             </div>
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-accent-400 to-accent-600 text-[12px] font-bold text-white shadow-sm ring-2 ring-white">
@@ -155,12 +160,14 @@ export default function Topbar() {
             >
               <div className="border-b border-slate-100 px-3.5 py-3">
                 <div className="text-[12.5px] font-semibold text-slate-900">
-                  {user?.username}
+                  {displayName}
                 </div>
-                <div className="mt-0.5 truncate text-[11.5px] text-slate-500">
-                  {user?.instituteName}
+                <div className="mt-0.5 text-[11.5px] font-medium text-accent-600">
+                  {role}
                 </div>
               </div>
+              {/* Sign out temporarily disabled (login flow is bypassed).
+                  To restore, uncomment this button and handleLogout / useAuth above.
               <button
                 type="button"
                 onClick={handleLogout}
@@ -170,6 +177,7 @@ export default function Topbar() {
                 <LogoutIcon />
                 Sign out
               </button>
+              */}
             </div>
           )}
         </div>
@@ -202,21 +210,22 @@ function SearchIcon() {
     </svg>
   );
 }
-function LogoutIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <polyline points="16 17 21 12 16 7" />
-      <line x1="21" y1="12" x2="9" y2="12" />
-    </svg>
-  );
-}
+// LogoutIcon — unused while sign-out is disabled. Restore with the Sign out button.
+// function LogoutIcon() {
+//   return (
+//     <svg
+//       width="14"
+//       height="14"
+//       viewBox="0 0 24 24"
+//       fill="none"
+//       stroke="currentColor"
+//       strokeWidth="2"
+//       strokeLinecap="round"
+//       strokeLinejoin="round"
+//     >
+//       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+//       <polyline points="16 17 21 12 16 7" />
+//       <line x1="21" y1="12" x2="9" y2="12" />
+//     </svg>
+//   );
+// }

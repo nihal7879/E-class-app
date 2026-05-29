@@ -13,6 +13,7 @@ import type {
   SchoolCompositionResponse,
   SchoolCoursesResponse,
   SchoolDetailResponse,
+  SchoolSubjectsResponse,
   StudentsResponse,
   SubjectDetailResponse,
   SubjectStudentsResponse,
@@ -114,6 +115,15 @@ export function useSchoolCourses(school: string | undefined): AsyncState<SchoolC
   return useApi(() => {
     if (!school) return Promise.reject(new Error("school is required"));
     return api.schoolCourses(school, filter);
+  }, [key, school]);
+}
+
+export function useSchoolSubjects(school: string | undefined): AsyncState<SchoolSubjectsResponse> {
+  const { filter } = useFilter();
+  const key = useFilterKey();
+  return useApi(() => {
+    if (!school) return Promise.reject(new Error("school is required"));
+    return api.schoolSubjects(school, filter);
   }, [key, school]);
 }
 
