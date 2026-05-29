@@ -275,13 +275,3 @@ export interface McqOverviewResponse {
 
 
 
-
-
-
-
-
-
-
-
-
-
