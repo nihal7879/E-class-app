@@ -20,8 +20,11 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const formPanelRef = useRef<HTMLElement>(null);
-  const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
+  // Cursor spotlight is driven imperatively (ref + transform) rather than via
+  // React state — moving the mouse must NOT re-render this heavy tree
+  // (CardStage, the SVG cards, the flying chips) on every pointer event.
+  const spotlightRef = useRef<HTMLDivElement>(null);
+  const panelRectRef = useRef<DOMRect | null>(null);
 
   // Card cycle: chips fly in from corners → idle floating near card → fly back to corners + card crossfades → repeat.
   const [cardIndex, setCardIndex] = useState(0); // 0 = Course Performance, 1 = Analytics
@@ -65,9 +68,23 @@ export default function LoginPage() {
     if (user) navigate(redirectTo, { replace: true });
   }, [user, redirectTo, navigate]);
 
+  // Cache the panel rect on enter so each move avoids a layout-forcing
+  // getBoundingClientRect; the panel doesn't move while the cursor is inside.
+  const handleEnter = (e: React.MouseEvent<HTMLElement>) => {
+    panelRectRef.current = e.currentTarget.getBoundingClientRect();
+  };
   const handleMove = (e: React.MouseEvent<HTMLElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setPointer({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    const el = spotlightRef.current;
+    const rect = panelRectRef.current;
+    if (!el || !rect) return;
+    const x = e.clientX - rect.left - 210;
+    const y = e.clientY - rect.top - 210;
+    el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+    el.style.opacity = "1";
+  };
+  const handleLeave = () => {
+    const el = spotlightRef.current;
+    if (el) el.style.opacity = "0";
   };
 
   // Submit handler: clears any prior error, flips the busy flag (disables the
@@ -122,7 +139,7 @@ export default function LoginPage() {
           className="relative z-10 flex items-center gap-3 animate-slideInLeft"
           style={{ animationDelay: "700ms" }}
         >
-          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/30 backdrop-blur-md">
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-accent-400 to-accent-600 text-white shadow-sm shadow-accent-900/30 ring-1 ring-inset ring-white/25">
             <BoltIcon />
           </span>
           <div className="leading-tight">
@@ -189,9 +206,9 @@ export default function LoginPage() {
 
       {/* ============== RIGHT FORM PANEL ============== */}
       <main
-        ref={formPanelRef}
+        onMouseEnter={handleEnter}
         onMouseMove={handleMove}
-        onMouseLeave={() => setPointer(null)}
+        onMouseLeave={handleLeave}
         className="relative flex w-full animate-slideInRight items-center justify-center overflow-hidden bg-[#f4f6fb] px-4 py-6 sm:px-6 lg:w-1/2"
         style={{ animationDelay: "500ms" }}
       >
@@ -220,18 +237,16 @@ export default function LoginPage() {
               "radial-gradient(ellipse at center, black 30%, transparent 75%)",
           }}
         />
-        {pointer && (
-          <div
-            className="pointer-events-none absolute h-[420px] w-[420px] rounded-full transition-opacity duration-200"
-            style={{
-              left: pointer.x - 210,
-              top: pointer.y - 210,
-              background:
-                "radial-gradient(circle, rgba(94,138,255,0.18) 0%, rgba(94,138,255,0) 65%)",
-              filter: "blur(8px)",
-            }}
-          />
-        )}
+        <div
+          ref={spotlightRef}
+          aria-hidden="true"
+          className="pointer-events-none absolute left-0 top-0 h-[420px] w-[420px] rounded-full opacity-0 transition-opacity duration-200 will-change-transform"
+          style={{
+            background:
+              "radial-gradient(circle, rgba(94,138,255,0.18) 0%, rgba(94,138,255,0) 65%)",
+            filter: "blur(8px)",
+          }}
+        />
 
         <div className="relative z-10 w-full max-w-[420px]">
           {/* Mobile logo */}
@@ -1038,8 +1053,15 @@ function DotsIcon() {
 }
 function BoltIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      shapeRendering="geometricPrecision"
+      className="block drop-shadow-[0_1px_1px_rgba(0,0,0,0.18)]"
+    >
+      <path d="M13.5 2 5 13.2a.75.75 0 0 0 .6 1.2H10.8l-1.3 7.2a.6.6 0 0 0 1.07.47L19 11.8a.75.75 0 0 0-.6-1.2H13.2l1.3-8.1A.6.6 0 0 0 13.5 2Z" />
     </svg>
   );
 }

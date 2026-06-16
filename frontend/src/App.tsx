@@ -10,8 +10,7 @@ import SchoolCoursesPage from "@/pages/SchoolCoursesPage";
 import CourseSubjectsPage from "@/pages/CourseSubjectsPage";
 import CourseOverviewPage from "@/pages/CourseOverviewPage";
 import SubjectDetailPage from "@/pages/SubjectDetailPage";
-// Login flow bypassed for now — app opens directly on the dashboard.
-// import LoginPage from "@/pages/LoginPage";
+import LoginPage from "@/pages/LoginPage";
 import CommandPalette from "@/components/ui/CommandPalette";
 import Loader from "@/components/ui/Loader";
 
@@ -30,11 +29,7 @@ export default function App() {
     // RequireAuth gate can read the same auth state.
     <AuthProvider>
       <Routes>
-        {/* Login bypassed for now — /login route disabled so any path falls
-            through to the dashboard. To restore, uncomment the LoginPage import
-            and this route, and re-enable the check in RequireAuth below.
         <Route path="/login" element={<LoginPage />} />
-        */}
         <Route
           path="/*"
           element={
@@ -70,10 +65,12 @@ export default function App() {
   );
 }
 
-// Route guard. Login is currently bypassed, so this just renders its children
-// (the dashboard is the landing page). To re-enable auth, uncomment the block
-// below (and restore the useAuth/useLocation imports + the /login route).
+// Route guard. Redirects unauthenticated users to /login, preserving the
+// path they were trying to reach (via router state) so LoginPage can bounce
+// them back there after a successful sign-in.
 function RequireAuth({ children }: { children: ReactNode }) {
+  // TEMP: login is bypassed for now — render the dashboard directly.
+  // To restore the auth gate, uncomment the block below.
   // const { user } = useAuth();
   // const location = useLocation();
   // if (!user) {

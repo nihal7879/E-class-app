@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import KpiStrip from "@/components/kpi/KpiStrip";
 import SchoolCompositionChart from "@/components/charts/SchoolCompositionChart";
 import VideoUsageCard from "@/components/charts/VideoUsageCard";
-import McqResultsCard from "@/components/charts/McqResultsCard";
+import McqResultsCard, { ScoreDistributionCard } from "@/components/charts/McqResultsCard";
 import SectionHeader from "@/components/ui/SectionHeader";
 import { schoolId } from "@/lib/parse";
 
@@ -30,6 +30,9 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           <VideoUsageCard />
           <McqResultsCard />
+        </div>
+        <div className="mt-4">
+          <ScoreDistributionCard />
         </div>
       </div>
     </div>

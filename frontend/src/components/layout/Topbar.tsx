@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { useCommandPalette } from "@/lib/commandPalette";
 import { useFilter } from "@/lib/filterContext";
-// Login flow bypassed for now — useAuth/logout no longer needed here.
-// import { useAuth } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 import FilterButton from "@/components/filters/FilterButton";
 
 export default function Topbar() {
@@ -11,7 +10,7 @@ export default function Topbar() {
   const nav = useNavigate();
   const { setOpen: setPaletteOpen } = useCommandPalette();
   const { reset: resetFilter } = useFilter();
-  // const { logout } = useAuth();
+  const { user } = useAuth();
   const onDetail = loc.pathname.startsWith("/school/");
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -27,28 +26,21 @@ export default function Topbar() {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [menuOpen]);
 
-  // Hardcoded identity for now — show only "Nirav Mehta" / "Admin", no email or
-  // institute. To restore the logged-in user, swap these back to:
-  //   const displayName = user?.name ?? user?.username ?? "Guest";
-  //   const role = user?.role ?? "Admin";
-  const displayName = "Nirav Mehta";
-  const role = "Admin";
-  const initials = "NM";
+  // Identity from the signed-in user (login is currently bypassed, so this
+  // falls back to a fixed identity).
+  const displayName = user?.name ?? user?.username ?? "Nirav Mehta";
+  const role = user?.role ?? "Admin";
+  const initials = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p.charAt(0).toUpperCase())
+    .join("") || "?";
 
   const handleBack = () => {
     resetFilter();
     nav("/dashboard");
   };
-
-  // Sign-out disabled while the login flow is bypassed. To restore, uncomment
-  // this and the useAuth import + logout destructure above, and the Sign out
-  // button in the menu below.
-  // const handleLogout = () => {
-  //   setMenuOpen(false);
-  //   resetFilter();
-  //   logout();
-  //   nav("/login", { replace: true });
-  // };
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 sm:px-6">
@@ -58,7 +50,7 @@ export default function Topbar() {
           className="flex shrink-0 items-center gap-2 rounded-lg pr-1 transition hover:opacity-90"
           aria-label="E-class Analytics — home"
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent-400 to-accent-600 text-white shadow-md shadow-accent-500/30">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent-400 to-accent-600 text-white shadow-sm shadow-accent-500/40 ring-1 ring-inset ring-white/25">
             <BoltIcon />
           </span>
           <span className="hidden leading-tight sm:block">
@@ -158,7 +150,7 @@ export default function Topbar() {
               role="menu"
               className="absolute right-0 top-full z-30 mt-2 w-60 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-cardHover animate-popIn"
             >
-              <div className="border-b border-slate-100 px-3.5 py-3">
+              <div className="px-3.5 py-3">
                 <div className="text-[12.5px] font-semibold text-slate-900">
                   {displayName}
                 </div>
@@ -166,18 +158,6 @@ export default function Topbar() {
                   {role}
                 </div>
               </div>
-              {/* Sign out temporarily disabled (login flow is bypassed).
-                  To restore, uncomment this button and handleLogout / useAuth above.
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-[12.5px] font-medium text-slate-700 transition hover:bg-slate-50"
-                role="menuitem"
-              >
-                <LogoutIcon />
-                Sign out
-              </button>
-              */}
             </div>
           )}
         </div>
@@ -188,8 +168,15 @@ export default function Topbar() {
 
 function BoltIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      shapeRendering="geometricPrecision"
+      className="block drop-shadow-[0_1px_1px_rgba(0,0,0,0.18)]"
+    >
+      <path d="M13.5 2 5 13.2a.75.75 0 0 0 .6 1.2H10.8l-1.3 7.2a.6.6 0 0 0 1.07.47L19 11.8a.75.75 0 0 0-.6-1.2H13.2l1.3-8.1A.6.6 0 0 0 13.5 2Z" />
     </svg>
   );
 }
@@ -210,22 +197,3 @@ function SearchIcon() {
     </svg>
   );
 }
-// LogoutIcon — unused while sign-out is disabled. Restore with the Sign out button.
-// function LogoutIcon() {
-//   return (
-//     <svg
-//       width="14"
-//       height="14"
-//       viewBox="0 0 24 24"
-//       fill="none"
-//       stroke="currentColor"
-//       strokeWidth="2"
-//       strokeLinecap="round"
-//       strokeLinejoin="round"
-//     >
-//       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-//       <polyline points="16 17 21 12 16 7" />
-//       <line x1="21" y1="12" x2="9" y2="12" />
-//     </svg>
-//   );
-// }

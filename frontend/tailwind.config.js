@@ -81,13 +81,16 @@ export default {
           "0%, 100%": { transform: "translateY(0)" },
           "50%": { transform: "translateY(-22px)" },
         },
+        // Translate only — no scale(): these orbs sit behind large blur()
+        // filters, and scaling a blurred layer forces a full re-rasterization
+        // every frame. Pure translate lets the compositor move a cached texture.
         orbDrift: {
-          "0%, 100%": { transform: "translate3d(0,0,0) scale(1)" },
-          "50%": { transform: "translate3d(40px,-30px,0) scale(1.08)" },
+          "0%, 100%": { transform: "translate3d(0,0,0)" },
+          "50%": { transform: "translate3d(40px,-30px,0)" },
         },
         orbDriftAlt: {
-          "0%, 100%": { transform: "translate3d(0,0,0) scale(1)" },
-          "50%": { transform: "translate3d(-30px,20px,0) scale(1.05)" },
+          "0%, 100%": { transform: "translate3d(0,0,0)" },
+          "50%": { transform: "translate3d(-30px,20px,0)" },
         },
         shimmer: {
           "0%": { backgroundPosition: "0% 50%" },

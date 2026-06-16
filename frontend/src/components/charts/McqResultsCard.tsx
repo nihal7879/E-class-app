@@ -59,11 +59,10 @@ export default function McqResultsCard() {
   const navigate = useNavigate();
   const { data, loading, error, refetch } = useMcqOverview();
   const overview = data ?? EMPTY_OVERVIEW;
-  // Default to showing ALL standards (ordered 1st → 10th). The score
-  // distribution below is labelled "all attempts", so a truncated Top-N list
-  // made the per-standard attempts appear not to add up to it (feedback #7).
-  // Showing all standards keeps the two views reconciled; the toggle remains.
-  const [showAll, setShowAll] = useState(true);
+  // Default to the Top 6 standards (client request). Score distribution now
+  // lives in its own card, so the per-standard list no longer needs to
+  // reconcile with an "all attempts" total here. The All toggle remains.
+  const [showAll, setShowAll] = useState(false);
 
   const hasData = overview.totalAttempts > 0;
   const visibleCourses = useMemo(() => {
@@ -175,63 +174,92 @@ export default function McqResultsCard() {
               ))}
             </ul>
           </div>
+        </div>
+      )}
+    </ChartCard>
+  );
+}
 
-          <div>
-            <div className="mb-1.5 flex items-center gap-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Score distribution (all attempts)
-              </span>
-              <InfoTip text="Every attempt is placed in one of five score bands (0–20% … 80–100%) by its percentage. Each bar's height is the number of attempts in that band, so the five bars together equal all attempts in the current filter." />
-            </div>
-            <div className="h-[140px]">
-              <ResponsiveContainer>
-                <BarChart
-                  data={overview.scoreDistribution}
-                  margin={{ top: 4, right: 8, bottom: 4, left: 0 }}
+// Score distribution shown as its own card (client request). Re-uses the same
+// MCQ overview endpoint as McqResultsCard; the per-card self-fetch pattern
+// matches the rest of the dashboard.
+export function ScoreDistributionCard() {
+  const { data, loading, error, refetch } = useMcqOverview();
+  const overview = data ?? EMPTY_OVERVIEW;
+  const hasData = overview.totalAttempts > 0;
+
+  return (
+    <ChartCard
+      title="Score distribution (all attempts)"
+      subtitle="An attempt is one completed MCQ quiz submission (a student can have several). Every attempt is grouped into one of five score bands by its percentage."
+    >
+      {error ? (
+        <ErrorState
+          title="Score distribution"
+          error={error}
+          onRetry={refetch}
+          height={220}
+        />
+      ) : loading && !data ? (
+        <ChartCardBodySkeleton height={220} />
+      ) : !hasData ? (
+        <Empty />
+      ) : (
+        <div>
+          <div className="mb-1.5 flex items-center gap-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Attempts per score band
+            </span>
+            <InfoTip text="Every attempt is placed in one of five score bands (0–20% … 80–100%) by its percentage. Each bar's height is the number of attempts in that band, so the five bars together equal all attempts in the current filter." />
+          </div>
+          <div className="h-[220px]">
+            <ResponsiveContainer>
+              <BarChart
+                data={overview.scoreDistribution}
+                margin={{ top: 4, right: 8, bottom: 4, left: 0 }}
+              >
+                <CartesianGrid
+                  stroke={GRID_COLOR}
+                  strokeDasharray={GRID_DASH}
+                  vertical={false}
+                />
+                <XAxis
+                  dataKey="bucket"
+                  tick={AXIS_TICK_STYLE}
+                  stroke={AXIS_COLOR}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  tick={AXIS_TICK_STYLE}
+                  stroke={AXIS_COLOR}
+                  tickLine={false}
+                  axisLine={false}
+                  allowDecimals={false}
+                  width={40}
+                />
+                <Tooltip
+                  cursor={{ fill: "#f1f5f9" }}
+                  content={
+                    <CustomTooltip
+                      formatter={(v) => `${formatNumber(Number(v))} attempts`}
+                    />
+                  }
+                />
+                <Bar
+                  dataKey="count"
+                  name="Attempts"
+                  radius={[4, 4, 0, 0]}
+                  isAnimationActive
+                  animationDuration={500}
                 >
-                  <CartesianGrid
-                    stroke={GRID_COLOR}
-                    strokeDasharray={GRID_DASH}
-                    vertical={false}
-                  />
-                  <XAxis
-                    dataKey="bucket"
-                    tick={AXIS_TICK_STYLE}
-                    stroke={AXIS_COLOR}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    tick={AXIS_TICK_STYLE}
-                    stroke={AXIS_COLOR}
-                    tickLine={false}
-                    axisLine={false}
-                    allowDecimals={false}
-                    width={40}
-                  />
-                  <Tooltip
-                    cursor={{ fill: "#f1f5f9" }}
-                    content={
-                      <CustomTooltip
-                        formatter={(v) => `${formatNumber(Number(v))} attempts`}
-                      />
-                    }
-                  />
-                  <Bar
-                    dataKey="count"
-                    name="Attempts"
-                    radius={[4, 4, 0, 0]}
-                    isAnimationActive
-                    animationDuration={500}
-                  >
-                    {overview.scoreDistribution.map((b) => {
-                      const mid = bucketMid(b.bucket);
-                      return <Cell key={b.bucket} fill={colorForPct(mid)} />;
-                    })}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+                  {overview.scoreDistribution.map((b) => {
+                    const mid = bucketMid(b.bucket);
+                    return <Cell key={b.bucket} fill={colorForPct(mid)} />;
+                  })}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
       )}
