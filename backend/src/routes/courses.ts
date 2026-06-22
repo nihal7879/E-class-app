@@ -18,6 +18,8 @@ router.get(
 
     const video = buildWhereClause({ ...filter, courses: [course] }, {
       dateColumn: "vu.last_access_date",
+      instituteColumn: "u.institute_id",
+      mediumColumn: "u.medium_id",
       schoolColumn: "u.school",
       courseColumn: "vu.course",
       divisionColumn: "u.division",
@@ -37,6 +39,8 @@ router.get(
 
     const mcq = buildWhereClause({ ...filter, courses: [course] }, {
       dateColumn: "mr.attempted_date",
+      instituteColumn: "u.institute_id",
+      mediumColumn: "u.medium_id",
       schoolColumn: "u.school",
       courseColumn: "mr.course",
       divisionColumn: "u.division",
@@ -80,6 +84,8 @@ router.get(
 
     const video = buildWhereClause({ ...filter, courses: [course] }, {
       dateColumn: "vu.last_access_date",
+      instituteColumn: "u.institute_id",
+      mediumColumn: "u.medium_id",
       schoolColumn: "u.school",
       courseColumn: "vu.course",
       divisionColumn: "u.division",
@@ -100,6 +106,8 @@ router.get(
 
     const mcq = buildWhereClause({ ...filter, courses: [course] }, {
       dateColumn: "mr.attempted_date",
+      instituteColumn: "u.institute_id",
+      mediumColumn: "u.medium_id",
       schoolColumn: "u.school",
       courseColumn: "mr.course",
       divisionColumn: "u.division",
@@ -170,6 +178,8 @@ router.get(
 
     const video = buildWhereClause({ ...filter, courses: [course] }, {
       dateColumn: "vu.last_access_date",
+      instituteColumn: "u.institute_id",
+      mediumColumn: "u.medium_id",
       schoolColumn: "u.school",
       courseColumn: "vu.course",
       divisionColumn: "u.division",
@@ -189,6 +199,8 @@ router.get(
 
     const mcq = buildWhereClause({ ...filter, courses: [course] }, {
       dateColumn: "mr.attempted_date",
+      instituteColumn: "u.institute_id",
+      mediumColumn: "u.medium_id",
       schoolColumn: "u.school",
       courseColumn: "mr.course",
       divisionColumn: "u.division",

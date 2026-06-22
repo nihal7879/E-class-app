@@ -1,17 +1,49 @@
 import { Router } from "express";
 import { pool } from "../db.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
+import { FilterQuerySchema } from "../lib/filters.js";
 
 const router = Router();
 
+// Small "col IN (?, ?)" helper for the cascading narrowing below.
+function inClause(col: string, vals: string[]): { sql: string; params: string[] } {
+  if (vals.length === 0) return { sql: "", params: [] };
+  return { sql: `${col} IN (${vals.map(() => "?").join(",")})`, params: [...vals] };
+}
+
+function andWhere(...clauses: string[]): string {
+  const parts = clauses.filter(Boolean);
+  return parts.length ? ` WHERE ${parts.join(" AND ")}` : "";
+}
+
+/**
+ * GET /api/filters/institutes
+ * Every institute (id + name). Powers the login dropdown.
+ */
+router.get(
+  "/institutes",
+  asyncHandler(async (_req, res) => {
+    const [rows] = await pool.query<any[]>(
+      `SELECT institute_id AS id, name FROM institutes ORDER BY name`,
+    );
+    res.json(rows.map((r) => ({ id: r.id, name: r.name })));
+  }),
+);
+
 /**
  * GET /api/filters/catalogue
- * Returns every distinct value that populates the FilterBar dropdowns.
- * Drives the frontend's getCatalogue() replacement.
+ * Every distinct value that populates the filter dropdowns. Cascades:
+ * when `institutes` (and/or `mediums`) are passed, `mediums` and `schools`
+ * narrow to that selection (Institute → Medium → School).
  */
 router.get(
   "/catalogue",
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
+    const f = FilterQuerySchema.parse(req.query);
+    const inst = inClause("u.institute_id", f.institutes);
+    const med = inClause("u.medium_id", f.mediums);
+    const sch = inClause("u.school", f.schools);
+
     const [yearRows] = await pool.query<any[]>(
       `SELECT DISTINCT y FROM (
          SELECT YEAR(login_date)       AS y FROM login_history WHERE login_date IS NOT NULL
@@ -28,15 +60,56 @@ router.get(
        ) t WHERE m IS NOT NULL ORDER BY m`,
     );
 
-    const [schoolRows] = await pool.query<any[]>(
-      `SELECT DISTINCT school FROM users WHERE school IS NOT NULL AND school <> '' ORDER BY school`,
+    // Institutes: always the full list (so the user can switch institute).
+    const [instituteRows] = await pool.query<any[]>(
+      `SELECT institute_id AS id, name FROM institutes ORDER BY name`,
     );
 
+    // Mediums: narrowed to the selected institute(s) AND school(s) — so a school
+    // login (or any view scoped to a school) only sees the mediums that school's
+    // students are actually enrolled under, not every medium in the system.
+    const [mediumRows] = await pool.query<any[]>(
+      `SELECT DISTINCT m.medium_id AS id, m.name AS name
+       FROM mediums m
+       JOIN users u ON u.medium_id = m.medium_id
+       ${andWhere(inst.sql, sch.sql)}
+       ORDER BY m.name`,
+      [...inst.params, ...sch.params],
+    );
+
+    // Schools: narrowed to the selected institute(s) + medium(s).
+    const [schoolRows] = await pool.query<any[]>(
+      `SELECT DISTINCT u.school AS school
+       FROM users u
+       ${andWhere("u.school IS NOT NULL", "u.school <> ''", inst.sql, med.sql)}
+       ORDER BY u.school`,
+      [...inst.params, ...med.params],
+    );
+
+    // Courses: narrowed to the selected institute(s) + medium(s) too. The
+    // institute/medium columns are projected into the derived table `t`, so the
+    // outer WHERE must reference t.*, not u.* (u is out of scope here).
+    const tInst = inClause("t.institute_id", f.institutes);
+    const tMed = inClause("t.medium_id", f.mediums);
+    const tSchool = inClause("t.school", f.schools);
+    const courseWhere = andWhere(
+      "t.course IS NOT NULL",
+      "t.course <> ''",
+      tInst.sql,
+      tMed.sql,
+      tSchool.sql,
+    );
     const [courseRows] = await pool.query<any[]>(
-      `SELECT DISTINCT course FROM (
-         SELECT course FROM video_usage WHERE course IS NOT NULL AND course <> ''
-         UNION SELECT course FROM mcq_report WHERE course IS NOT NULL AND course <> ''
-       ) t ORDER BY course`,
+      `SELECT DISTINCT t.course AS course FROM (
+         SELECT vu.course AS course, u.institute_id, u.medium_id, u.school
+           FROM video_usage vu JOIN users u ON u.user_id = vu.user_id
+         UNION ALL
+         SELECT mr.course AS course, u.institute_id, u.medium_id, u.school
+           FROM mcq_report mr JOIN users u ON u.user_id = mr.user_id
+       ) t
+       ${courseWhere}
+       ORDER BY t.course`,
+      [...tInst.params, ...tMed.params, ...tSchool.params],
     );
 
     const [divisionRows] = await pool.query<any[]>(
@@ -58,6 +131,8 @@ router.get(
     res.json({
       years: yearRows.map((r) => r.y),
       months: monthRows.map((r) => r.m),
+      institutes: instituteRows.map((r) => ({ id: r.id, name: r.name })),
+      mediums: mediumRows.map((r) => ({ id: r.id, name: r.name })),
       schools: schoolRows.map((r) => r.school),
       courses: courseRows.map((r) => r.course),
       divisions: divisionRows.map((r) => r.division),

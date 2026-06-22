@@ -1,9 +1,27 @@
 // Response shapes for backend routes under /api.
 // Keep in sync with backend/src/routes/*.ts.
 
+export interface InstituteOption {
+  id: number;
+  name: string;
+}
+
+// POST /api/auth/login — returns the institute OR school resolved from the
+// credentials, discriminated by the `type` chosen in the login dropdown.
+export type LoginResponse =
+  | { type: "I"; instituteId: number; instituteName: string }
+  | { type: "S"; schoolId: number; schoolName: string };
+
+export interface MediumOption {
+  id: number;
+  name: string;
+}
+
 export interface FilterCatalogue {
   years: number[];
   months: number[];
+  institutes: InstituteOption[];
+  mediums: MediumOption[];
   schools: string[];
   courses: string[];
   divisions: string[];

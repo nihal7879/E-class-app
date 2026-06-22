@@ -3,15 +3,19 @@ import { useLocation, useNavigate, Link } from "react-router-dom";
 import { useCommandPalette } from "@/lib/commandPalette";
 import { useFilter } from "@/lib/filterContext";
 import { useAuth } from "@/lib/auth";
+import { api } from "@/lib/api";
 import FilterButton from "@/components/filters/FilterButton";
 
 export default function Topbar() {
   const loc = useLocation();
   const nav = useNavigate();
   const { setOpen: setPaletteOpen } = useCommandPalette();
-  const { reset: resetFilter } = useFilter();
-  const { user } = useAuth();
+  const { reset: resetFilter, filter } = useFilter();
+  const { user, logout } = useAuth();
   const onDetail = loc.pathname.startsWith("/school/");
+  // School-scoped sign-ins land on their own school page and have nowhere to go
+  // "back" to (no institute dashboard), so the Back button is suppressed for them.
+  const isSchoolLogin = user?.loginType === "S";
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -26,10 +30,9 @@ export default function Topbar() {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [menuOpen]);
 
-  // Identity from the signed-in user (login is currently bypassed, so this
-  // falls back to a fixed identity).
-  const displayName = user?.name ?? user?.username ?? "Nirav Mehta";
-  const role = user?.role ?? "Admin";
+  // Identity + institute scope from the signed-in user.
+  const displayName = user?.name ?? user?.username ?? "Guest";
+  const instituteName = user?.instituteName ?? user?.schoolName ?? "";
   const initials = displayName
     .split(/\s+/)
     .filter(Boolean)
@@ -40,6 +43,23 @@ export default function Topbar() {
   const handleBack = () => {
     resetFilter();
     nav("/dashboard");
+  };
+
+  // Trigger the filter-aware 3-sheet Excel download via a transient <a download>.
+  const handleDownload = () => {
+    const a = document.createElement("a");
+    a.href = api.reportExportUrl(filter);
+    a.download = "eclass-report.xlsx";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
+  const handleLogout = () => {
+    setMenuOpen(false);
+    resetFilter();
+    logout();
+    nav("/login", { replace: true });
   };
 
   return (
@@ -65,7 +85,7 @@ export default function Topbar() {
 
         <div className="hidden h-7 w-px bg-slate-200 sm:block" />
 
-        {onDetail && (
+        {onDetail && !isSchoolLogin && (
           <button
             onClick={handleBack}
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 sm:px-2.5 sm:py-1.5"
@@ -89,9 +109,11 @@ export default function Topbar() {
         )}
 
         <div className="min-w-0">
-          <h1 className="truncate text-[14px] font-semibold text-slate-900 sm:text-[15px]">
-            {onDetail ? "School details" : "Institute Summary"}
-          </h1>
+          <div className="flex min-w-0 items-center gap-2">
+            <h1 className="truncate text-[14px] font-semibold text-slate-900 sm:text-[15px]">
+              {onDetail ? "School details" : instituteName || "Institute Summary"}
+            </h1>
+          </div>
           <p className="hidden truncate text-[11.5px] text-slate-500 sm:block">
             {onDetail
               ? "How students at this school are using the platform"
@@ -122,6 +144,17 @@ export default function Topbar() {
 
         <FilterButton />
 
+        <button
+          type="button"
+          onClick={handleDownload}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+          aria-label="Download Excel report"
+          title="Download report (Login History, Video Usage, MCQ Report)"
+        >
+          <DownloadIcon />
+          <span className="hidden lg:inline">Download</span>
+        </button>
+
         <div className="hidden h-7 w-px bg-slate-200 sm:block" />
 
         <div className="relative" ref={menuRef}>
@@ -136,9 +169,6 @@ export default function Topbar() {
               <div className="text-[12.5px] font-semibold text-slate-900">
                 {displayName}
               </div>
-              <div className="truncate text-[11px] text-slate-500">
-                {role}
-              </div>
             </div>
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-accent-400 to-accent-600 text-[12px] font-bold text-white shadow-sm ring-2 ring-white">
               {initials}
@@ -150,14 +180,25 @@ export default function Topbar() {
               role="menu"
               className="absolute right-0 top-full z-30 mt-2 w-60 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-cardHover animate-popIn"
             >
-              <div className="px-3.5 py-3">
+              <div className="border-b border-slate-100 px-3.5 py-3">
                 <div className="text-[12.5px] font-semibold text-slate-900">
                   {displayName}
                 </div>
-                <div className="mt-0.5 text-[11.5px] font-medium text-accent-600">
-                  {role}
-                </div>
+                {instituteName && (
+                  <div className="mt-1 truncate text-[11px] text-slate-500">
+                    {instituteName}
+                  </div>
+                )}
               </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-[12.5px] font-medium text-slate-700 transition hover:bg-slate-50"
+                role="menuitem"
+              >
+                <LogoutIcon />
+                Sign out
+              </button>
             </div>
           )}
         </div>
@@ -194,6 +235,42 @@ function SearchIcon() {
     >
       <circle cx="11" cy="11" r="7" />
       <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+function DownloadIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+function LogoutIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
     </svg>
   );
 }

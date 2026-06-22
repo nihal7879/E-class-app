@@ -28,7 +28,10 @@ router.get(
 
     const login = buildWhereClause(filter, {
       dateColumn: "lh.login_date",
+      instituteColumn: "u.institute_id",
+      mediumColumn: "u.medium_id",
       schoolColumn: "u.school",
+      courseUserColumn: "lh.user_id",
       divisionColumn: "u.division",
       genderColumn: "u.gender",
     });
@@ -46,6 +49,8 @@ router.get(
 
     const video = buildWhereClause(filter, {
       dateColumn: "vu.last_access_date",
+      instituteColumn: "u.institute_id",
+      mediumColumn: "u.medium_id",
       schoolColumn: "u.school",
       courseColumn: "vu.course",
       divisionColumn: "u.division",
@@ -64,6 +69,8 @@ router.get(
 
     const mcq = buildWhereClause(filter, {
       dateColumn: "mr.attempted_date",
+      instituteColumn: "u.institute_id",
+      mediumColumn: "u.medium_id",
       schoolColumn: "u.school",
       courseColumn: "mr.course",
       divisionColumn: "u.division",

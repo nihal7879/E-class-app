@@ -10,13 +10,18 @@
     "typecheck": "tsc --noEmit",
     "ingest": "tsx src/ingest/cli.ts",
     "ingest:excel": "tsx src/ingest/cli.ts --source=excel",
-    "ingest:api": "tsx src/ingest/cli.ts --source=api"
+    "ingest:api": "tsx src/ingest/cli.ts --source=api",
+    "db:bootstrap-dev": "tsx src/scripts/bootstrap-dev-db.ts",
+    "db:apply-schema": "tsx src/scripts/apply-schema.ts",
+    "db:backfill": "tsx src/scripts/backfill.ts",
+    "cron": "tsx src/cron.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
     "mysql2": "^3.11.4",
+    "node-cron": "^3.0.3",
     "xlsx": "^0.18.5",
     "zod": "^3.23.8"
   },
@@ -24,6 +29,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^22.7.5",
+    "@types/node-cron": "^3.0.11",
     "tsx": "^4.19.1",
     "typescript": "^5.6.3"
   }

@@ -10,12 +10,30 @@
 export interface RawUser {
   userKind: "Student" | "Teacher" | null;
   school: string | null;
+  schoolId: number | null;
   userId: number;
   enrollmentId: string | null;
   studentName: string | null;
   division: string | null;
   emailId: string | null;
   gender: string | null;
+  instituteId: number | null;
+  mediumId: number | null;
+}
+
+export interface RawInstitute {
+  id: number;
+  name: string | null;
+}
+
+export interface RawSchool {
+  id: number;
+  name: string | null;
+}
+
+export interface RawMedium {
+  id: number;
+  name: string | null;
 }
 
 export interface RawLogin {
@@ -60,4 +78,7 @@ export interface IngestBatch {
   logins: RawLogin[];
   videos: RawVideo[];
   mcq: RawMcq[];
+  institutes: RawInstitute[];
+  mediums: RawMedium[];
+  schools: RawSchool[];
 }

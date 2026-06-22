@@ -1,5 +1,7 @@
 import type { FilterState } from "./types";
 import type {
+  InstituteOption,
+  LoginResponse,
   CourseDetailResponse,
   CourseSchoolsResponse,
   CourseSubjectsResponse,
@@ -32,6 +34,8 @@ function filterToParams(f: FilterState | undefined): URLSearchParams {
   // Joining with commas would corrupt values that contain commas — e.g. the
   // school name "Jilha Parishad Prathamik Shala, Nandanmal" was being split
   // into two non-matching halves on the backend.
+  for (const i of f.institutes) p.append("institutes", i);
+  for (const m of f.mediums)    p.append("mediums",    m);
   for (const s of f.schools)   p.append("schools",   s);
   for (const c of f.courses)   p.append("courses",   c);
   for (const d of f.divisions) p.append("divisions", d);
@@ -78,10 +82,37 @@ async function getJson<T>(path: string, params?: URLSearchParams): Promise<T> {
   }
 }
 
+// POST helper for auth. Surfaces the backend's `error` message (e.g. "Invalid
+// username or password.") so the caller can show it inline instead of a generic
+// HTTP status. Throws an Error whose message is that backend text on non-2xx.
+async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    const message = (data && (data.error as string)) || `${res.status} ${res.statusText}`;
+    throw new Error(message);
+  }
+  return data as T;
+}
+
 export const api = {
   health: () => getJson<{ ok: boolean }>("/api/health"),
 
-  catalogue: () => getJson<FilterCatalogue>("/api/filters/catalogue"),
+  // Validates credentials upstream and resolves the local institute ("I") or
+  // school ("S"), depending on the account type picked in the login dropdown.
+  login: (username: string, password: string, type: "I" | "S" = "I") =>
+    postJson<LoginResponse>("/api/auth/login", { username, password, type }),
+
+  // Catalogue cascades on institute/medium so the School/Medium lists narrow to
+  // the current selection. Passing the filter is optional (full lists when omitted).
+  catalogue: (f?: FilterState) =>
+    getJson<FilterCatalogue>("/api/filters/catalogue", filterToParams(f)),
+
+  institutes: () => getJson<InstituteOption[]>("/api/filters/institutes"),
 
   kpis: (f: FilterState) =>
     getJson<KpiResponse>("/api/kpis", filterToParams(f)),
@@ -130,6 +161,14 @@ export const api = {
 
   students: (f: FilterState, opts?: { limit?: number; sort?: "logins" | "sessionMs" | "videoViews" | "mcqAttempts" }) =>
     getJson<StudentsResponse>("/api/students", withExtra(filterToParams(f), opts)),
+
+  // Full URL for the 3-sheet Excel export (Login History / Video Usage / MCQ
+  // Report), filter-aware. The browser downloads it directly via an <a download>
+  // — it's a binary file response, not JSON, so it doesn't go through getJson.
+  reportExportUrl: (f: FilterState) => {
+    const qs = filterToParams(f).toString();
+    return `${BASE}/api/report/export${qs ? `?${qs}` : ""}`;
+  },
 };
 
 

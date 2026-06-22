@@ -77,8 +77,20 @@ function mergeFilter(base: FilterState, extra?: Partial<FilterState>): FilterSta
   return { ...base, ...extra };
 }
 
-export function useCatalogue(): AsyncState<FilterCatalogue> {
-  return useApi(() => api.catalogue(), []);
+export function useCatalogue(
+  override?: Pick<FilterState, "institutes" | "mediums" | "schools">,
+): AsyncState<FilterCatalogue> {
+  // Cascade: refetch when the institute/medium/school selection changes so the
+  // School and Course lists narrow to that selection (Institute → Medium →
+  // School → Course). Callers (the filter popover) can pass the in-progress
+  // DRAFT selection via `override` so the lists narrow live — before "Apply" —
+  // instead of only after the filter is committed.
+  const { filter } = useFilter();
+  const institutes = override?.institutes ?? filter.institutes;
+  const mediums = override?.mediums ?? filter.mediums;
+  const schools = override?.schools ?? filter.schools;
+  const key = JSON.stringify({ institutes, mediums, schools });
+  return useApi(() => api.catalogue({ ...filter, institutes, mediums, schools }), [key]);
 }
 
 export function useKpis(): AsyncState<KpiResponse> {

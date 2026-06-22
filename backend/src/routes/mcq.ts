@@ -18,6 +18,8 @@ router.get(
 
     const mcq = buildWhereClause(filter, {
       dateColumn: "mr.attempted_date",
+      instituteColumn: "u.institute_id",
+      mediumColumn: "u.medium_id",
       schoolColumn: "u.school",
       courseColumn: "mr.course",
       divisionColumn: "u.division",
@@ -90,6 +92,8 @@ router.get(
 
     const mcq = buildWhereClause(filter, {
       dateColumn: "mr.attempted_date",
+      instituteColumn: "u.institute_id",
+      mediumColumn: "u.medium_id",
       schoolColumn: "u.school",
       courseColumn: "mr.course",
       divisionColumn: "u.division",

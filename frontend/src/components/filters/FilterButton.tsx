@@ -11,16 +11,20 @@ import { useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
 import { useCatalogue } from "@/lib/hooks";
 import { useFilter } from "@/lib/filterContext";
+import { useAuth } from "@/lib/auth";
 import type { FilterState } from "@/lib/types";
 
-// A fully-cleared filter — used by "Reset all" inside the draft.
+// A fully-cleared filter — used by "Reset all" inside the draft. The sticky
+// `institutes` scope is preserved by the reset handler, not by this literal.
 const EMPTY_FILTER: FilterState = {
-  year: "all", month: "all", schools: [], courses: [],
+  year: "all", month: "all", institutes: [], mediums: [], schools: [], courses: [],
   divisions: [], genders: [],
 };
 
 const EMPTY_CAT = {
   years: [] as number[], months: [] as number[],
+  institutes: [] as { id: number; name: string }[],
+  mediums: [] as { id: number; name: string }[],
   schools: [] as string[], courses: [] as string[],
   divisions: [] as string[], genders: [] as string[],
   minDate: null as string | null, maxDate: null as string | null,
@@ -44,14 +48,14 @@ interface Pos {
 
 export default function FilterButton() {
   const { filter, setFilter, hasActive } = useFilter();
+  const { user } = useAuth();
+  // A school login is locked to its own school — the School filter is meaningless
+  // (and the school is its sticky scope, so it shouldn't count as an active filter).
+  const isSchoolLogin = user?.loginType === "S";
   const loc = useLocation();
   const nav = useNavigate();
   const isSm = useIsSm();
   const onDetail = loc.pathname.startsWith("/school/");
-  // Server-backed: full catalogue. (Cascading "narrow to compatible values" is
-  // an enhancement we can layer on a future /api/filters/cascade endpoint.)
-  const { data: catData } = useCatalogue();
-  const available = catData ?? EMPTY_CAT;
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -69,20 +73,50 @@ export default function FilterButton() {
   }, [open]);
   const isDirty = JSON.stringify(draft) !== JSON.stringify(filter);
 
+  // Server-backed catalogue. While the popover is open we cascade off the in-
+  // progress DRAFT selection so the School/Course lists narrow the moment a
+  // Medium is picked — without waiting for "Apply". When closed it follows the
+  // committed filter (same as the rest of the app).
+  const { data: catData } = useCatalogue(
+    open
+      ? { institutes: draft.institutes, mediums: draft.mediums, schools: draft.schools }
+      : undefined,
+  );
+  const available = catData ?? EMPTY_CAT;
+
   // Commit the draft to the shared filter (triggers the dashboard refetch),
   // then mirror the old navigate-on-school behaviour and close the popover.
   const applyDraft = () => {
     setFilter(() => draft);
     if (onDetail) {
       if (draft.schools.length === 1) nav(`/school/${schoolId(draft.schools[0])}`);
-      else if (draft.schools.length === 0) nav("/dashboard");
+      // A school login must never fall back to the institute dashboard — its
+      // school scope is fixed, so it always stays on its own school page.
+      else if (draft.schools.length === 0 && !isSchoolLogin) nav("/dashboard");
     }
     setOpen(false);
   };
 
-  // Badge + active styling reflect the COMMITTED filter, not the draft.
+  // Reset all: clear every selection (keep the sticky institute scope) and
+  // COMMIT it immediately — no separate "Apply" click needed. If we're on a
+  // school detail page, fall back to the dashboard since the scope is gone.
+  const resetAll = () => {
+    const cleared: FilterState = {
+      ...EMPTY_FILTER,
+      institutes: filter.institutes,
+      // Keep a school login's sticky school scope; only institute logins clear it.
+      schools: isSchoolLogin ? filter.schools : [],
+    };
+    setDraft(cleared);
+    setFilter(() => cleared);
+    if (onDetail && !isSchoolLogin) nav("/dashboard");
+  };
+
+  // Badge + active styling reflect the COMMITTED filter, not the draft. The
+  // institute scope is sticky (from login) and intentionally not counted.
   const activeCount =
-    filter.schools.length +
+    filter.mediums.length +
+    (isSchoolLogin ? 0 : filter.schools.length) +
     filter.courses.length +
     (filter.dateFrom || filter.dateTo ? 1 : 0);
 
@@ -90,6 +124,16 @@ export default function FilterButton() {
   const courseOptions = useMemo(
     () => sortCourses(available.courses),
     [available.courses],
+  );
+
+  // Medium options are id→name; MultiSelect works on string ids.
+  const mediumIds = useMemo(
+    () => available.mediums.map((m) => String(m.id)),
+    [available.mediums],
+  );
+  const mediumNameById = useMemo(
+    () => new Map(available.mediums.map((m) => [String(m.id), m.name] as const)),
+    [available.mediums],
   );
 
   useLayoutEffect(() => {
@@ -224,7 +268,31 @@ export default function FilterButton() {
                     }
                   />
                 </div>
-                {available.schools.length > 0 && (
+                {available.mediums.length > 0 && (
+                  <div className="sm:col-span-2">
+                    <MultiSelect
+                      label="Medium"
+                      options={mediumIds}
+                      value={draft.mediums}
+                      // Changing medium narrows schools AND courses — clear stale
+                      // school/course picks so they can't reference another medium.
+                      // Exception: a school login's school is its fixed scope, so
+                      // keep it (clearing it un-narrows the catalogue to ALL mediums
+                      // and drops the view back to the institute dashboard).
+                      onChange={(next) =>
+                        setDraft((f) => ({
+                          ...f,
+                          mediums: next,
+                          schools: isSchoolLogin ? f.schools : [],
+                          courses: [],
+                        }))
+                      }
+                      placeholder="All mediums"
+                      formatOption={(o) => mediumNameById.get(o) ?? o}
+                    />
+                  </div>
+                )}
+                {!isSchoolLogin && available.schools.length > 0 && (
                   <div className="sm:col-span-2">
                     <MultiSelect
                       label="School"
@@ -256,8 +324,11 @@ export default function FilterButton() {
             <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/60 px-4 py-2.5">
               <button
                 type="button"
-                onClick={() => setDraft(EMPTY_FILTER)}
+                // Keep the sticky institute scope; clear everything else and
+                // apply immediately (no separate "Apply" click required).
+                onClick={resetAll}
                 disabled={
+                  draft.mediums.length === 0 &&
                   draft.schools.length === 0 &&
                   draft.courses.length === 0 &&
                   !draft.dateFrom &&

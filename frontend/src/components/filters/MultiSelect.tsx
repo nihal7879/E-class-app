@@ -13,7 +13,13 @@ interface MultiSelectProps {
 }
 
 interface PanelPos {
-  top: number;
+  // Anchor to either the top or bottom edge: when the panel opens downward we
+  // pin its top to the button's bottom; when it opens upward we pin its bottom
+  // to just above the button. Pinning the bottom (rather than computing a top
+  // from maxHeight) keeps the panel attached to the button even when it holds
+  // only a couple of items — otherwise a short list floats detached above it.
+  top?: number;
+  bottom?: number;
   left: number;
   width: number;
   maxHeight: number;
@@ -48,8 +54,14 @@ export default function MultiSelect({
       const openUp = spaceBelow < 220 && spaceAbove > spaceBelow;
       const maxHeight = Math.min(wantHeight, openUp ? spaceAbove : spaceBelow);
       const left = Math.min(r.left, viewportW - minWidth - 8);
-      const top = openUp ? r.top - maxHeight - 8 : r.bottom + 8;
-      setPos({ top, left: Math.max(8, left), width: minWidth, maxHeight });
+      setPos({
+        ...(openUp
+          ? { bottom: viewportH - r.top + 8 }
+          : { top: r.bottom + 8 }),
+        left: Math.max(8, left),
+        width: minWidth,
+        maxHeight,
+      });
     };
     compute();
     const onScroll = () => compute();
@@ -143,6 +155,7 @@ export default function MultiSelect({
             style={{
               position: "fixed",
               top: pos.top,
+              bottom: pos.bottom,
               left: pos.left,
               width: pos.width,
               maxHeight: pos.maxHeight,

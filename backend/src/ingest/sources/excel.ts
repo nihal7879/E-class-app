@@ -42,12 +42,17 @@ export function readExcel(filePath: string): IngestBatch {
       userMap.set(userId, {
         userKind: parseUserKind(raw["Student/Teacher"]),
         school: nullIfEmpty(raw["School"]),
+        // Legacy Excel exports predate SchoolID — name only.
+        schoolId: null,
         userId,
         enrollmentId: nullIfEmpty(raw["EnrollmentID"]),
         studentName: nullIfEmpty(raw["StudentName"]),
         division: nullIfEmpty(raw["Division"]),
         emailId: nullIfEmpty(raw["EmailID"]),
         gender: nullIfEmpty(raw["Gender"]),
+        // The legacy Excel exports predate institute/medium — leave them null.
+        instituteId: null,
+        mediumId: null,
       });
     }
     return userId;
@@ -128,6 +133,9 @@ export function readExcel(filePath: string): IngestBatch {
     logins,
     videos,
     mcq,
+    institutes: [],
+    mediums: [],
+    schools: [],
   };
 }
 

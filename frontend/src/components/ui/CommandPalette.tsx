@@ -206,7 +206,8 @@ export default function CommandPalette() {
             </span>
           </div>
           <span className="num">
-            {filtered.length} of {allItems.length}
+            {filtered.filter((it) => it.kind === "school").length} of{" "}
+            {allItems.filter((it) => it.kind === "school").length}
           </span>
         </div>
       </div>

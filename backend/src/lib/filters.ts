@@ -35,6 +35,8 @@ const DateString = z
 export const FilterQuerySchema = z.object({
   year: YearOrAll.default("all"),
   month: MonthOrAll.default("all"),
+  institutes: CsvList, // institute IDs (numeric, kept as strings for the IN list)
+  mediums: CsvList,    // medium IDs
   schools: CsvList,
   courses: CsvList,
   divisions: CsvList,
@@ -47,8 +49,14 @@ export type FilterQuery = z.infer<typeof FilterQuerySchema>;
 
 export interface ClauseOptions {
   dateColumn: string;          // e.g. "lh.login_date" or "vu.last_access_date"
+  instituteColumn?: string;    // e.g. "u.institute_id"
+  mediumColumn?: string;       // e.g. "u.medium_id"
   schoolColumn?: string;       // e.g. "u.school"
-  courseColumn?: string;       // e.g. "vu.course" — omit for tables without course
+  courseColumn?: string;       // e.g. "vu.course" — direct course column (video/mcq)
+  // For login-based tables that have NO course column: restrict to users who are
+  // active in the selected course(s). Pass the user-id column (e.g. "lh.user_id")
+  // and a course filter becomes "this row belongs to a student of that course".
+  courseUserColumn?: string;
   divisionColumn?: string;     // e.g. "u.division"
   genderColumn?: string;       // e.g. "u.gender"
 }
@@ -86,6 +94,14 @@ export function buildWhereClause(f: FilterQuery, opts: ClauseOptions): BuiltClau
     }
   }
 
+  if (opts.instituteColumn && f.institutes.length > 0) {
+    parts.push(`${opts.instituteColumn} IN (${f.institutes.map(() => "?").join(",")})`);
+    params.push(...f.institutes);
+  }
+  if (opts.mediumColumn && f.mediums.length > 0) {
+    parts.push(`${opts.mediumColumn} IN (${f.mediums.map(() => "?").join(",")})`);
+    params.push(...f.mediums);
+  }
   if (opts.schoolColumn && f.schools.length > 0) {
     parts.push(`${opts.schoolColumn} IN (${f.schools.map(() => "?").join(",")})`);
     params.push(...f.schools);
@@ -93,6 +109,18 @@ export function buildWhereClause(f: FilterQuery, opts: ClauseOptions): BuiltClau
   if (opts.courseColumn && f.courses.length > 0) {
     parts.push(`${opts.courseColumn} IN (${f.courses.map(() => "?").join(",")})`);
     params.push(...f.courses);
+  }
+  // Course filter on a course-less (login) table: keep only rows whose user is
+  // active in the selected course(s), via a video/mcq membership subquery. This
+  // is what makes logins / sessions / student counts respect the Course filter.
+  if (opts.courseUserColumn && f.courses.length > 0) {
+    const ph = f.courses.map(() => "?").join(",");
+    parts.push(
+      `${opts.courseUserColumn} IN (` +
+        `SELECT user_id FROM video_usage WHERE course IN (${ph}) ` +
+        `UNION SELECT user_id FROM mcq_report WHERE course IN (${ph}))`,
+    );
+    params.push(...f.courses, ...f.courses);
   }
   if (opts.divisionColumn && f.divisions.length > 0) {
     parts.push(`${opts.divisionColumn} IN (${f.divisions.map(() => "?").join(",")})`);

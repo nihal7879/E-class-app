@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { INSTITUTES, useAuth } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 
 const BRAND = "#4338ca"; // indigo button — matches Vertex spec
 const PURPLE = "#7c3aed"; // accent for "institute" word
@@ -13,7 +13,7 @@ export default function LoginPage() {
   // user from (passed via router state), or the dashboard by default.
   const redirectTo = (location.state as { from?: string } | null)?.from ?? "/dashboard";
 
-  const [instituteId, setInstituteId] = useState<string>("");
+  const [loginType, setLoginType] = useState<"I" | "S">("I"); // "I" = institute, "S" = school
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
@@ -57,15 +57,17 @@ export default function LoginPage() {
     };
   }, []);
 
-  const selectedInstitute = useMemo(
-    () => INSTITUTES.find((i) => i.id === instituteId) ?? null,
-    [instituteId],
-  );
-
   // If the user is already signed in (e.g. navigated to /login manually or
   // rehydrated from localStorage), skip the form and redirect straight away.
   useEffect(() => {
-    if (user) navigate(redirectTo, { replace: true });
+    if (!user) return;
+    // A school sign-in jumps straight to its own school page; an institute
+    // sign-in goes to the dashboard (or wherever RequireAuth bounced from).
+    if (user.loginType === "S" && user.schoolName) {
+      navigate(`/school/${encodeURIComponent(user.schoolName)}`, { replace: true });
+    } else {
+      navigate(redirectTo, { replace: true });
+    }
   }, [user, redirectTo, navigate]);
 
   // Cache the panel rect on enter so each move avoids a layout-forcing
@@ -96,13 +98,18 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     setBusy(true);
-    const result = await login(instituteId, username, password);
+    const result = await login(username, password, loginType);
     setBusy(false);
     if (!result.ok) {
       setError(result.error);
       return;
     }
-    navigate(redirectTo, { replace: true });
+    // School sign-in → open that school's page; institute → dashboard.
+    if (result.loginType === "S") {
+      navigate(`/school/${encodeURIComponent(result.schoolName)}`, { replace: true });
+    } else {
+      navigate(redirectTo, { replace: true });
+    }
   };
 
   return (
@@ -272,43 +279,49 @@ export default function LoginPage() {
           <div className="animate-slideInRight" style={{ animationDelay: "660ms" }}>
             <h2 className="text-[26px] font-bold leading-tight tracking-tight text-slate-900">
               Sign in to your{" "}
-              <span style={{ color: PURPLE }}>institute</span>
+              <span style={{ color: PURPLE }}>{loginType === "S" ? "school" : "institute"}</span>
             </h2>
             <p className="mt-1.5 text-[12.5px] text-slate-500">
-              Choose your institute and enter your credentials to continue.
+              Enter your {loginType === "S" ? "school" : "institute"} credentials to continue.
             </p>
           </div>
 
           <form onSubmit={onSubmit} className="mt-5 space-y-3">
-            {/* Institute */}
-            <div className="animate-slideInRight" style={{ animationDelay: "760ms" }}>
-              <FieldLabel htmlFor="institute">Institute</FieldLabel>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                  <BuildingIcon />
-                </span>
-                <select
-                  id="institute"
-                  value={instituteId}
-                  onChange={(e) => setInstituteId(e.target.value)}
-                  className="block w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-9 text-[13px] text-slate-900 outline-none transition focus:border-accent-400 focus:ring-2 focus:ring-accent-100"
-                  required
-                >
-                  <option value="" disabled>
-                    Select your institute…
-                  </option>
-                  {INSTITUTES.map((inst) => (
-                    <option key={inst.id} value={inst.id}>
-                      {inst.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <div className="animate-slideInRight" style={{ animationDelay: "710ms" }}>
+              <FieldLabel htmlFor="loginType">Sign in as</FieldLabel>
+              <div
+                id="loginType"
+                role="tablist"
+                aria-label="Account type"
+                className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 ring-1 ring-inset ring-slate-200"
+              >
+                {([
+                  { value: "I" as const, label: "Institute", icon: <BuildingIcon /> },
+                  { value: "S" as const, label: "School", icon: <SchoolCapIcon /> },
+                ]).map((opt) => {
+                  const active = loginType === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setLoginType(opt.value)}
+                      className={
+                        "flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-semibold transition-all duration-200 " +
+                        (active
+                          ? "bg-white text-accent-700 shadow-sm ring-1 ring-slate-200"
+                          : "text-slate-500 hover:text-slate-700")
+                      }
+                    >
+                      {opt.icon}
+                      {opt.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
-
-            {/* Username */}
-            <div className="animate-slideInRight" style={{ animationDelay: "860ms" }}>
+            <div className="animate-slideInRight" style={{ animationDelay: "760ms" }}>
               <FieldLabel htmlFor="username">Username</FieldLabel>
               <div className="relative">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
@@ -320,15 +333,12 @@ export default function LoginPage() {
                   autoComplete="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="owner@jms.com"
+                  placeholder={loginType === "S" ? "School username" : "Institute username"}
                   className="block w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-[13px] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-accent-400 focus:ring-2 focus:ring-accent-100"
-                  required
                 />
               </div>
             </div>
-
-            {/* Password */}
-            <div className="animate-slideInRight" style={{ animationDelay: "960ms" }}>
+            <div className="animate-slideInRight" style={{ animationDelay: "860ms" }}>
               <FieldLabel htmlFor="password">Password</FieldLabel>
               <div className="relative">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
@@ -342,14 +352,12 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
                   className="block w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-10 text-[13px] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-accent-400 focus:ring-2 focus:ring-accent-100"
-                  required
-                  minLength={4}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPwd((v) => !v)}
                   aria-label={showPwd ? "Hide password" : "Show password"}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600"
                 >
                   {showPwd ? <EyeOffIcon /> : <EyeIcon />}
                 </button>
@@ -365,7 +373,7 @@ export default function LoginPage() {
             {/* Submit */}
             <button
               type="submit"
-              disabled={busy}
+              disabled={busy || !username.trim() || !password}
               style={{
                 animationDelay: "1160ms",
                 backgroundColor: BRAND,
@@ -390,28 +398,11 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Trust badge pills */}
-          <div
-            className="mt-4 flex animate-slideInRight items-center justify-center gap-2"
-            style={{ animationDelay: "1260ms" }}
-          >
-            <TrustBadge icon={<LockIcon small />} label="Encrypted" />
-            <TrustBadge icon={<ShieldIcon />} label="SSO ready" />
-            <TrustBadge icon={<AuditIcon />} label="Audit log" />
-          </div>
-
           <p
             className="mt-3 animate-slideInRight text-center text-[11.5px] text-slate-500"
             style={{ animationDelay: "1360ms" }}
           >
-            Need access?{" "}
-            {selectedInstitute ? (
-              <span className="font-medium text-slate-700">
-                Contact {selectedInstitute.name} administrator.
-              </span>
-            ) : (
-              "Contact your institute administrator."
-            )}
+            Need access? Contact your institute administrator.
           </p>
         </div>
       </main>
@@ -420,15 +411,6 @@ export default function LoginPage() {
 }
 
 /* ===================== Components ===================== */
-
-function TrustBadge({ icon, label }: { icon: React.ReactNode; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[10.5px] font-medium text-slate-600 ring-1 ring-slate-200/70">
-      <span className="text-slate-400">{icon}</span>
-      {label}
-    </span>
-  );
-}
 
 function FieldLabel({
   htmlFor,
@@ -1018,13 +1000,6 @@ function EyeOffIcon() {
     </svg>
   );
 }
-function ChevronDown({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="6 9 12 15 18 9" />
-    </svg>
-  );
-}
 function Spinner() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="animate-spin">
@@ -1087,34 +1062,27 @@ function TabletIcon() {
     </svg>
   );
 }
-function ShieldIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-    </svg>
-  );
-}
-function AuditIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="9" y1="13" x2="15" y2="13" />
-      <line x1="9" y1="17" x2="13" y2="17" />
-    </svg>
-  );
-}
 function BuildingIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="4" y="2" width="16" height="20" rx="2" />
-      <line x1="9" y1="6" x2="9" y2="6.01" />
-      <line x1="15" y1="6" x2="15" y2="6.01" />
-      <line x1="9" y1="10" x2="9" y2="10.01" />
-      <line x1="15" y1="10" x2="15" y2="10.01" />
-      <line x1="9" y1="14" x2="9" y2="14.01" />
-      <line x1="15" y1="14" x2="15" y2="14.01" />
-      <path d="M10 22v-4h4v4" />
+      <rect x="4" y="2" width="16" height="20" rx="1.5" />
+      <path d="M9 22v-4h6v4" />
+      <line x1="8" y1="6" x2="8" y2="6.01" />
+      <line x1="12" y1="6" x2="12" y2="6.01" />
+      <line x1="16" y1="6" x2="16" y2="6.01" />
+      <line x1="8" y1="10" x2="8" y2="10.01" />
+      <line x1="12" y1="10" x2="12" y2="10.01" />
+      <line x1="16" y1="10" x2="16" y2="10.01" />
+      <line x1="8" y1="14" x2="8" y2="14.01" />
+      <line x1="16" y1="14" x2="16" y2="14.01" />
+    </svg>
+  );
+}
+function SchoolCapIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 10 12 5 2 10l10 5 10-5Z" />
+      <path d="M6 12v5c0 1 2.7 2.5 6 2.5s6-1.5 6-2.5v-5" />
     </svg>
   );
 }

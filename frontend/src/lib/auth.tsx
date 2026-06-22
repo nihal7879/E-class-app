@@ -1,59 +1,48 @@
 // =============================================================================
-// AUTH FLOW (client-only, mock auth — no backend involved yet)
+// AUTH FLOW (institute credentials, validated by the backend)
 // -----------------------------------------------------------------------------
 // 1. AuthProvider wraps the app (see App.tsx) and holds the current `user`.
 // 2. On first render it hydrates `user` from localStorage, so a signed-in
 //    session survives page reloads.
-// 3. LoginPage calls `login(institute, username, password)`. Validation is
-//    done locally — there is NO server check. Any username + 4+ char password
-//    against a known institute "succeeds".
-// 4. On success the user object is stored in state (and mirrored to
-//    localStorage by the effect below), which unblocks the RequireAuth gate
-//    in App.tsx and routes the user to the dashboard.
+// 3. LoginPage calls `login(username, password)`. These are forwarded to
+//    POST /api/auth/login, which validates them against the upstream
+//    Authenticate API and resolves the matching institute in our DB.
+// 4. On success the user object (scoped to that institute) is stored in state
+//    (and mirrored to localStorage by the effect below), which unblocks the
+//    RequireAuth gate in App.tsx and routes the user to the dashboard.
 // 5. `logout()` clears state (and localStorage), sending the user back to
 //    /login (see Topbar.handleLogout).
-//
-// NOTE: This is placeholder auth for the UI. Replace `login` with a real API
-// call when the backend auth endpoint exists.
 // =============================================================================
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-
-export interface Institute {
-  id: string;
-  name: string;
-  shortName: string;
-}
-
-// Hardcoded list of institutes shown in the login dropdown. The chosen id is
-// validated in `login` and stored on the user (drives the Topbar label, etc.).
-export const INSTITUTES: Institute[] = [
-  { id: "millicent", name: "Millicent Group of Schools", shortName: "MGS" },
-  { id: "sunshine", name: "Sunshine International Academy", shortName: "SIA" },
-  { id: "vidya-bhavan", name: "Vidya Bhavan Trust", shortName: "VBT" },
-  { id: "nalanda", name: "Nalanda Education Society", shortName: "NES" },
-];
+import { api } from "./api";
 
 export interface AuthUser {
-  instituteId: string;
-  instituteName: string;
+  loginType: "I" | "S";      // which dropdown option signed in
+  instituteId?: number;      // set when loginType === "I"
+  instituteName?: string;
+  schoolId?: number;         // set when loginType === "S"
+  schoolName?: string;
   username: string;
   name: string; // display name derived from the username/email
   role: string; // shown under the name in the topbar
 }
 
-// "nirav.mehta@millicent.in" -> "Nirav Mehta"; "owner" -> "Owner".
-function deriveDisplayName(username: string): string {
-  const local = username.split("@")[0];
-  const parts = local.split(/[._\-\s]+/).filter(Boolean);
-  if (parts.length === 0) return username;
-  return parts
-    .map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
-    .join(" ");
-}
+// What login() reports back so the caller can route appropriately (a school
+// sign-in jumps straight to that school's page).
+type LoginResult =
+  | { ok: true; loginType: "I" }
+  | { ok: true; loginType: "S"; schoolName: string }
+  | { ok: false; error: string };
 
 interface AuthContextValue {
   user: AuthUser | null;
-  login: (instituteId: string, username: string, password: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  // Sign in with institute ("I") or school ("S") credentials; the backend
+  // validates them upstream and resolves the matching institute/school.
+  login: (
+    username: string,
+    password: string,
+    type: "I" | "S",
+  ) => Promise<LoginResult>;
   logout: () => void;
 }
 
@@ -81,26 +70,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     else localStorage.removeItem(STORAGE_KEY);
   }, [user]);
 
-  // Mock sign-in: validates inputs locally and (on success) sets the user.
-  // Returns a discriminated result so the caller can show inline errors
-  // instead of throwing. No real credential check happens here.
-  const login = useCallback<AuthContextValue["login"]>(async (instituteId, username, password) => {
-    const institute = INSTITUTES.find((i) => i.id === instituteId);
-    if (!institute) return { ok: false, error: "Please choose an institute." };
-    if (!username.trim()) return { ok: false, error: "Username is required." };
-    if (password.length < 4) return { ok: false, error: "Password must be at least 4 characters." };
-
-    // Simulated network delay so the UI shows loading feedback.
-    await new Promise((r) => setTimeout(r, 450));
-    const trimmed = username.trim();
-    setUser({
-      instituteId: institute.id,
-      instituteName: institute.name,
-      username: trimmed,
-      name: deriveDisplayName(trimmed),
-      role: "Admin",
-    });
-    return { ok: true };
+  // Sign-in: forwards credentials to the backend, which validates them upstream
+  // and returns the matching institute. Returns a discriminated result so the
+  // caller can show inline errors instead of throwing.
+  const login = useCallback<AuthContextValue["login"]>(async (username, password, type) => {
+    if (!username.trim() || !password) {
+      return { ok: false, error: "Please enter your username and password." };
+    }
+    try {
+      const res = await api.login(username.trim(), password, type);
+      if (res.type === "S") {
+        setUser({
+          loginType: "S",
+          schoolId: res.schoolId,
+          schoolName: res.schoolName,
+          username: username.trim(),
+          name: res.schoolName,
+          role: "School",
+        });
+        return { ok: true, loginType: "S", schoolName: res.schoolName };
+      }
+      setUser({
+        loginType: "I",
+        instituteId: res.instituteId,
+        instituteName: res.instituteName,
+        username: username.trim(),
+        name: res.instituteName,
+        role: "Admin",
+      });
+      return { ok: true, loginType: "I" };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : "Sign in failed. Please try again." };
+    }
   }, []);
 
   // Clearing the user triggers the sync effect (wipes localStorage) and makes
