@@ -48,11 +48,6 @@ export default function VideoUsageCard() {
   const subjectPalette = useSubjectPalette(
     visibleCourses.flatMap((c) => c.subjects.map((s) => s.subject)),
   );
-  const maxCourseMs = visibleCourses.reduce(
-    (m, c) => Math.max(m, c.durationMs),
-    0,
-  );
-
   const openCourse = (course: string) =>
     navigate(`/course/${toCourseId(course)}?from=video`);
 
@@ -145,7 +140,6 @@ export default function VideoUsageCard() {
                 <CourseRow
                   key={c.course}
                   course={c}
-                  maxMs={maxCourseMs}
                   subjectPalette={subjectPalette}
                   onOpen={() => openCourse(c.course)}
                 />
@@ -162,14 +156,12 @@ export default function VideoUsageCard() {
 
 interface CourseRowProps {
   course: import("@/lib/apiTypes").VideoCourseBreakdown;
-  maxMs: number;
   subjectPalette: Map<string, string>;
   onOpen: () => void;
 }
 
-function CourseRow({ course, maxMs, subjectPalette, onOpen }: CourseRowProps) {
+function CourseRow({ course, subjectPalette, onOpen }: CourseRowProps) {
   const [hoverSubj, setHoverSubj] = useState<string | null>(null);
-  const widthPct = maxMs > 0 ? (course.durationMs / maxMs) * 100 : 0;
   const TOP_SUBJ = 5;
   const top = course.subjects.slice(0, TOP_SUBJ);
   const rest = course.subjects.slice(TOP_SUBJ);
@@ -215,9 +207,12 @@ function CourseRow({ course, maxMs, subjectPalette, onOpen }: CourseRowProps) {
             <ChevronRight />
           </div>
         </div>
+        {/* Every row's bar spans the whole width and is divided among the
+            standard's subjects by their share of this standard's watch time.
+            All bars are the same size — the segment split (not the bar length)
+            carries the meaning. */}
         <div
-          className="mt-1.5 flex h-3 overflow-hidden rounded-full bg-slate-100"
-          style={{ width: `${Math.max(widthPct, 3)}%`, minWidth: 48 }}
+          className="mt-1.5 flex h-3 w-full overflow-hidden rounded-full bg-slate-100"
           onMouseLeave={() => setHoverSubj(null)}
         >
           {segments.map((seg) => {

@@ -1,8 +1,28 @@
 import { Router } from "express";
-import xlsx from "xlsx";
+// xlsx-js-style is a drop-in, API-compatible fork of SheetJS that actually
+// honours cell styles (`cell.s`) on write — the community `xlsx` build ignores
+// them, so bold headers would have no effect there.
+import xlsx from "xlsx-js-style";
 import { pool } from "../db.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { FilterQuerySchema, buildWhereClause } from "../lib/filters.js";
+
+// Shared header style: bold white text on a slate-blue fill.
+const HEADER_STYLE = {
+  font: { bold: true, color: { rgb: "FFFFFF" } },
+  fill: { patternType: "solid", fgColor: { rgb: "1E3A5F" } },
+  alignment: { vertical: "center" },
+} as const;
+
+// Style every cell in the header row (row 0) of a worksheet — bold + fill.
+function boldHeaderRow(ws: xlsx.WorkSheet): void {
+  const range = xlsx.utils.decode_range(ws["!ref"] ?? "A1");
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const addr = xlsx.utils.encode_cell({ r: range.s.r, c });
+    const cell = ws[addr];
+    if (cell) cell.s = { ...(cell.s ?? {}), ...HEADER_STYLE };
+  }
+}
 
 const router = Router();
 
@@ -31,7 +51,7 @@ router.get(
       divisionColumn: "u.division",
       genderColumn: "u.gender",
     });
-    const [loginRows] = await pool.query<any[]>(
+    const loginQ = pool.query<any[]>(
       `SELECT
          u.enrollment_id  AS \`Enrollment ID\`,
          u.student_name   AS \`Student Name\`,
@@ -63,7 +83,7 @@ router.get(
       divisionColumn: "u.division",
       genderColumn: "u.gender",
     });
-    const [videoRows] = await pool.query<any[]>(
+    const videoQ = pool.query<any[]>(
       `SELECT
          u.enrollment_id        AS \`Enrollment ID\`,
          u.student_name         AS \`Student Name\`,
@@ -99,7 +119,7 @@ router.get(
       divisionColumn: "u.division",
       genderColumn: "u.gender",
     });
-    const [mcqRows] = await pool.query<any[]>(
+    const mcqQ = pool.query<any[]>(
       `SELECT
          u.enrollment_id       AS \`Enrollment ID\`,
          u.student_name        AS \`Student Name\`,
@@ -127,6 +147,14 @@ router.get(
       mcq.params,
     );
 
+    // The three sheet queries are independent — run them concurrently so the
+    // export waits on the slowest query, not the sum of all three.
+    const [[loginRows], [videoRows], [mcqRows]] = await Promise.all([
+      loginQ,
+      videoQ,
+      mcqQ,
+    ]);
+
     // json_to_sheet on an empty array produces a blank sheet (no header row).
     // Seed a single empty-valued row off the known headers so an empty result
     // still shows the column titles instead of a blank tab.
@@ -136,35 +164,32 @@ router.get(
         : xlsx.utils.json_to_sheet([], { header: headers });
 
     const wb = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(
-      wb,
-      sheet(loginRows, [
-        "Enrollment ID", "Student Name", "User Type", "School", "Division",
-        "Gender", "Medium", "Login Date", "Login Time", "Logout Date",
-        "Logout Time", "Session Time",
-      ]),
-      "Login History",
-    );
-    xlsx.utils.book_append_sheet(
-      wb,
-      sheet(videoRows, [
-        "Enrollment ID", "Student Name", "User Type", "School", "Division",
-        "Gender", "Medium", "Course", "Subject", "Chapter", "Content Name",
-        "Content Type", "Total View Duration", "Total View Count",
-        "Last Access Date", "Last Access Time",
-      ]),
-      "Video Usage",
-    );
-    xlsx.utils.book_append_sheet(
-      wb,
-      sheet(mcqRows, [
-        "Enrollment ID", "Student Name", "User Type", "School", "Division",
-        "Gender", "Medium", "Course", "Subject", "Chapter", "Total Questions",
-        "Right Answers", "Total Marks", "Marks Obtained", "Percentage",
-        "Attempted Date", "Attempted Time", "Time Spent",
-      ]),
-      "MCQ Report",
-    );
+
+    const loginWs = sheet(loginRows, [
+      "Enrollment ID", "Student Name", "User Type", "School", "Division",
+      "Gender", "Medium", "Login Date", "Login Time", "Logout Date",
+      "Logout Time", "Session Time",
+    ]);
+    boldHeaderRow(loginWs);
+    xlsx.utils.book_append_sheet(wb, loginWs, "Login History");
+
+    const videoWs = sheet(videoRows, [
+      "Enrollment ID", "Student Name", "User Type", "School", "Division",
+      "Gender", "Medium", "Course", "Subject", "Chapter", "Content Name",
+      "Content Type", "Total View Duration", "Total View Count",
+      "Last Access Date", "Last Access Time",
+    ]);
+    boldHeaderRow(videoWs);
+    xlsx.utils.book_append_sheet(wb, videoWs, "Video Usage");
+
+    const mcqWs = sheet(mcqRows, [
+      "Enrollment ID", "Student Name", "User Type", "School", "Division",
+      "Gender", "Medium", "Course", "Subject", "Chapter", "Total Questions",
+      "Right Answers", "Total Marks", "Marks Obtained", "Percentage",
+      "Attempted Date", "Attempted Time", "Time Spent",
+    ]);
+    boldHeaderRow(mcqWs);
+    xlsx.utils.book_append_sheet(wb, mcqWs, "MCQ Report");
 
     const buf = xlsx.write(wb, { type: "buffer", bookType: "xlsx" });
 

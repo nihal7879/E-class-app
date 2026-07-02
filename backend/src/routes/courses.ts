@@ -50,7 +50,8 @@ router.get(
       `SELECT COUNT(*) AS mcqAttempts,
               COALESCE(AVG(mr.percentage), 0) AS avgPercentage,
               COALESCE(SUM(mr.right_question_count), 0) AS rightAnswers,
-              COALESCE(SUM(mr.total_question), 0)       AS totalQuestions
+              COALESCE(SUM(mr.total_question), 0)       AS totalQuestions,
+              COUNT(DISTINCT mr.user_id)                AS mcqStudents
        FROM mcq_report mr
        JOIN users u ON u.user_id = mr.user_id
        ${mcq.where}`,
@@ -61,10 +62,16 @@ router.get(
       course,
       videoViews:     Number(videoRows[0]?.videoViews ?? 0),
       videoWatchMs:   Number(videoRows[0]?.videoWatchMs ?? 0),
+      // uniqueStudents = distinct students who watched video for this standard.
+      // mcqStudents    = distinct students who attempted MCQs for this standard.
+      // These populations differ (MCQ attempters ⊂ video watchers), so the UI
+      // must show the one matching the drill-in context (video vs MCQ) — see
+      // client issue on the MCQ card "students" not matching this page.
       uniqueStudents: Number(videoRows[0]?.uniqueStudents ?? 0),
       subjects:       Number(videoRows[0]?.subjects ?? 0),
       schools:        Number(videoRows[0]?.schools ?? 0),
       mcqAttempts:    Number(mcqRows[0]?.mcqAttempts ?? 0),
+      mcqStudents:    Number(mcqRows[0]?.mcqStudents ?? 0),
       avgPercentage:  Number(mcqRows[0]?.avgPercentage ?? 0),
       rightAnswers:   Number(mcqRows[0]?.rightAnswers ?? 0),
       totalQuestions: Number(mcqRows[0]?.totalQuestions ?? 0),

@@ -118,6 +118,7 @@ export interface CourseDetailResponse {
   subjects: number;
   schools: number;
   mcqAttempts: number;
+  mcqStudents: number;
   avgPercentage: number;
   rightAnswers: number;
   totalQuestions: number;

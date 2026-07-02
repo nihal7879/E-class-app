@@ -12,7 +12,13 @@
  */
 import { watch } from "node:fs";
 import cron from "node-cron";
-import { cronConfigPath, env, loadCronConfig } from "../config.js";
+import {
+  cronConfigPath,
+  DEFAULT_CRON_SCHEDULE,
+  DEFAULT_CRON_TIMEZONE,
+  env,
+  loadCronConfig,
+} from "../config.js";
 import { readFromApi } from "../ingest/sources/api.js";
 import { loadBatch } from "../ingest/loader.js";
 import { yesterdayISO } from "../lib/dates.js";
@@ -37,18 +43,23 @@ let task: cron.ScheduledTask | null = null;
 let current = ""; // "schedule|timezone" currently registered — skip no-op reloads
 let watching = false;
 
-/** (Re)register the cron task from the current config/cron.json. */
+/** (Re)register the cron task from the hardcoded default (optionally overridden). */
 function register(): void {
-  const { schedule, timezone } = loadCronConfig();
-  const signature = `${schedule}|${timezone}`;
-  if (signature === current) return; // unchanged — nothing to do
+  let { schedule, timezone } = loadCronConfig();
 
+  // Never leave the job unscheduled: if an override produced an invalid cron
+  // string, fall back to the hardcoded default rather than skipping (skipping on
+  // first run would mean NO daily ingest at all — the failure we're fixing).
   if (!cron.validate(schedule)) {
     console.error(
-      `[cron] invalid schedule "${schedule}" (config/cron.json) — keeping previous schedule`,
+      `[cron] invalid schedule "${schedule}" (override) — falling back to default "${DEFAULT_CRON_SCHEDULE}"`,
     );
-    return;
+    schedule = DEFAULT_CRON_SCHEDULE;
+    timezone = DEFAULT_CRON_TIMEZONE;
   }
+
+  const signature = `${schedule}|${timezone}`;
+  if (signature === current) return; // unchanged — nothing to do
 
   task?.stop();
   task = cron.schedule(schedule, () => void runDailyIngest(), { timezone });

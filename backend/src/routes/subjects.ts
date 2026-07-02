@@ -85,11 +85,32 @@ router.get(
       students: number;
       mcqAttempts: number;
     };
+    // The same chapter is written differently in the two reports. Video is
+    // clean ("1. Distributional Maps"). MCQ chapter strings are malformed: the
+    // number is dropped (". Distributional Maps") and sometimes the previous
+    // chapter's name is mashed in front (". Distributional Maps2. Endogenetic
+    // Movements" — the real chapter is "Endogenetic Movements", ch 2).
+    //
+    // In every case the real chapter name is the text AFTER the LAST "<number>."
+    // ordinal marker (or after leading punctuation when there is no number).
+    // Cutting there aligns video and MCQ onto one key so a chapter is a single
+    // row carrying both. Heuristic: a legit name containing a bare "<digits>."
+    // mid-title would be over-trimmed, but that does not occur in this data.
+    const cleanChapterLabel = (raw: string): string => {
+      const s = (raw ?? "")
+        .trim()
+        .replace(/^.*[0-9०-९]+\s*[.):\-]\s*/, "") // drop up to the last ordinal
+        .replace(/^[\s.):\-]+/, "")               // then any leading punctuation
+        .trim();
+      return s || (raw ?? "").trim();
+    };
+    const normalizeChapterKey = (raw: string): string =>
+      cleanChapterLabel(raw).toLowerCase().replace(/\s+/g, " ");
     const chapterMap = new Map<string, ChapterRow>();
     for (const r of chapterRows) {
-      const key = r.chapter ?? "";
+      const key = normalizeChapterKey(r.chapter ?? "");
       chapterMap.set(key, {
-        chapter: key,
+        chapter: r.chapter ?? "", // video name is clean — keep as-is for display
         videoViews: Number(r.videoViews),
         videoWatchMs: Number(r.videoWatchMs),
         contents: Number(r.contents),
@@ -98,14 +119,18 @@ router.get(
       });
     }
     for (const r of mcqChapterRows) {
-      const key = r.chapter ?? "";
-      if (!key) continue;
+      if (!r.chapter) continue;
+      const key = normalizeChapterKey(r.chapter);
       const existing = chapterMap.get(key);
       if (existing) {
-        existing.mcqAttempts = Number(r.mcqAttempts);
+        // Same chapter as a video row — fold MCQ attempts into it.
+        existing.mcqAttempts += Number(r.mcqAttempts);
+        if (!existing.chapter) existing.chapter = cleanChapterLabel(r.chapter);
       } else {
+        // MCQ-only chapter (no video) — show the cleaned name, not the raw
+        // malformed string.
         chapterMap.set(key, {
-          chapter: key,
+          chapter: cleanChapterLabel(r.chapter),
           videoViews: 0,
           videoWatchMs: 0,
           contents: 0,

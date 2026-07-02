@@ -6,7 +6,9 @@
  *     npm run ingest:api -- --date=2026-06-15  # backfill a specific day
  *     npm run ingest:api -- --from=2026-01-01 --to=2026-06-20   # backfill a range
  *                                              # (range defaults to --mode=replace:
- *                                              #  a clean, idempotent re-bootstrap)
+ *                                              #  a clean,
+ * 
+ *  idempotent re-bootstrap)
  *
  *   Flow 2 (fallback, manual Excel upload):
  *     npm run ingest:excel -- --file="path/to/report.xlsx"

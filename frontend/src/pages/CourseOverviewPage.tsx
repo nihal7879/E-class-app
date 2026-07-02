@@ -72,14 +72,18 @@ export default function CourseOverviewPage() {
     if (!d) return null;
     return {
       totalSchools:    d.schools,
-      totalStudents:   d.uniqueStudents,
+      // When drilled in from the MCQ card, "Students" must mean students who
+      // attempted MCQs (matches the card's per-standard count); otherwise it
+      // means students who watched video. Mixing the two caused the reported
+      // 8-vs-67 mismatch.
+      totalStudents:   focus === "mcq" ? d.mcqStudents : d.uniqueStudents,
       totalSubjects:   d.subjects,
       videoViews:      d.videoViews,
       videoDurationMs: d.videoWatchMs,
       mcqAttempts:     d.mcqAttempts,
       avgMcqPercentage: d.avgPercentage,
     };
-  }, [detailApi.data]);
+  }, [detailApi.data, focus]);
 
   const subjects: CourseOverviewSubject[] = useMemo(
     () =>
