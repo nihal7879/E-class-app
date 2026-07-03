@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useCourseSubjects } from "@/lib/hooks";
-import { useFilter } from "@/lib/filterContext";
+import { useFilter, useExportScope } from "@/lib/filterContext";
 import {
   courseFromId,
   courseId as toCourseId,
@@ -28,6 +28,16 @@ export default function CourseSubjectsPage() {
   const focusSuffix = fromParam === "video" || fromParam === "mcq" ? `?from=${fromParam}` : "";
   const { setFilter } = useFilter();
   const navigate = useNavigate();
+  // Scope the Excel download to this school + course.
+  useExportScope(
+    useMemo(
+      () => ({
+        schools: school ? [school] : [],
+        courses: course ? [course] : [],
+      }),
+      [school, course],
+    ),
+  );
 
   useEffect(() => {
     if (!school) return;

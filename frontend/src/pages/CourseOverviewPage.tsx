@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useCourseDetail, useCourseSchools, useCourseSubjects } from "@/lib/hooks";
+import { useExportScope } from "@/lib/filterContext";
 import {
   courseFromId,
   formatCourseLabel,
@@ -57,6 +58,8 @@ type FocusMode = "video" | "mcq" | "all";
 export default function CourseOverviewPage() {
   const { courseId } = useParams<{ courseId: string }>();
   const course = courseId ? courseFromId(courseId) : "";
+  // Scope the Excel download to this course only (does not affect the charts).
+  useExportScope(useMemo(() => ({ courses: course ? [course] : [] }), [course]));
   const [searchParams] = useSearchParams();
   const fromParam = searchParams.get("from");
   const focus: FocusMode =

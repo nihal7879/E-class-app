@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useSubjectDetail, useSubjectStudents } from "@/lib/hooks";
-import { useFilter } from "@/lib/filterContext";
+import { useFilter, useExportScope } from "@/lib/filterContext";
 
 interface SubjectChapterStat {
   chapter: string;
@@ -61,6 +61,17 @@ export default function SubjectDetailPage() {
   const course = cId ? courseFromId(cId) : "";
   const subject = subId ? subjectFromId(subId) : "";
   const { setFilter } = useFilter();
+  // Scope the Excel download to exactly this school + course + subject.
+  useExportScope(
+    useMemo(
+      () => ({
+        schools: school ? [school] : [],
+        courses: course ? [course] : [],
+        subjects: subject ? [subject] : [],
+      }),
+      [school, course, subject],
+    ),
+  );
 
   useEffect(() => {
     if (!school) return;

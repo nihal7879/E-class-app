@@ -1,4 +1,4 @@
-import type { FilterState } from "./types";
+import type { ExportScope, FilterState } from "./types";
 import type {
   InstituteOption,
   LoginResponse,
@@ -165,8 +165,17 @@ export const api = {
   // Full URL for the 3-sheet Excel export (Login History / Video Usage / MCQ
   // Report), filter-aware. The browser downloads it directly via an <a download>
   // — it's a binary file response, not JSON, so it doesn't go through getJson.
-  reportExportUrl: (f: FilterState) => {
-    const qs = filterToParams(f).toString();
+  //
+  // `scope` is a page-scoped override (course / subject of the current drill-down)
+  // merged on top of the global filter so the download matches exactly the page
+  // the user is on. Its fields REPLACE the corresponding filter values (a course
+  // page exports that course regardless of the global course filter).
+  reportExportUrl: (f: FilterState, scope?: ExportScope) => {
+    const p = filterToParams(f);
+    if (scope?.schools)  { p.delete("schools");  for (const s of scope.schools)  p.append("schools", s); }
+    if (scope?.courses)  { p.delete("courses");  for (const c of scope.courses)  p.append("courses", c); }
+    if (scope?.subjects) { p.delete("subjects"); for (const s of scope.subjects) p.append("subjects", s); }
+    const qs = p.toString();
     return `${BASE}/api/report/export${qs ? `?${qs}` : ""}`;
   },
 };

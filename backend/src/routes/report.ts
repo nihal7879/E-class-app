@@ -42,12 +42,17 @@ router.get(
   asyncHandler(async (req, res) => {
     const filter = FilterQuerySchema.parse(req.query);
 
-    // Login History — no course column on this dataset.
+    // Login History — no course/subject column on this dataset, so a course or
+    // subject filter is applied via student membership (keep only logins of users
+    // active in the selected course/subject) so this sheet also reflects the
+    // current drill-down instead of dumping every student's logins.
     const login = buildWhereClause(filter, {
       dateColumn: "lh.login_date",
       instituteColumn: "u.institute_id",
       mediumColumn: "u.medium_id",
       schoolColumn: "u.school",
+      courseUserColumn: "lh.user_id",
+      subjectUserColumn: "lh.user_id",
       divisionColumn: "u.division",
       genderColumn: "u.gender",
     });
@@ -80,6 +85,7 @@ router.get(
       mediumColumn: "u.medium_id",
       schoolColumn: "u.school",
       courseColumn: "vu.course",
+      subjectColumn: "vu.subject",
       divisionColumn: "u.division",
       genderColumn: "u.gender",
     });
@@ -116,6 +122,7 @@ router.get(
       mediumColumn: "u.medium_id",
       schoolColumn: "u.school",
       courseColumn: "mr.course",
+      subjectColumn: "mr.subject",
       divisionColumn: "u.division",
       genderColumn: "u.gender",
     });

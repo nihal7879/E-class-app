@@ -10,7 +10,7 @@ export default function Topbar() {
   const loc = useLocation();
   const nav = useNavigate();
   const { setOpen: setPaletteOpen } = useCommandPalette();
-  const { reset: resetFilter, filter } = useFilter();
+  const { reset: resetFilter, filter, exportScope } = useFilter();
   const { user, logout } = useAuth();
   const onDetail = loc.pathname.startsWith("/school/");
   // School-scoped sign-ins land on their own school page and have nowhere to go
@@ -53,7 +53,7 @@ export default function Topbar() {
     if (downloading) return;
     setDownloading(true);
     try {
-      const res = await fetch(api.reportExportUrl(filter));
+      const res = await fetch(api.reportExportUrl(filter, exportScope));
       if (!res.ok) throw new Error(`Export failed (${res.status})`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
