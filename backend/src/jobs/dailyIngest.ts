@@ -20,23 +20,30 @@ import {
   loadCronConfig,
 } from "../config.js";
 import { readFromApi } from "../ingest/sources/api.js";
-import { loadBatch } from "../ingest/loader.js";
+import { loadBatch, type LoadResult } from "../ingest/loader.js";
 import { yesterdayISO } from "../lib/dates.js";
 
-export async function runDailyIngest(): Promise<void> {
+/**
+ * Runs the idempotent daily ingest for yesterday and RETURNS the load result.
+ *
+ * Errors are intentionally NOT swallowed here — they propagate to the caller so
+ * that the HTTP cron endpoint (Vercel) responds with a non-2xx status. A swallowed
+ * error made every Vercel cron run report HTTP 200 "success" while ingesting
+ * nothing (e.g. when the DB refused the serverless egress IP), which is exactly
+ * how a broken cron went unnoticed. The in-process node-cron caller catches this
+ * itself so a failed run still never crashes the long-lived process.
+ */
+export async function runDailyIngest(): Promise<LoadResult> {
   const date = yesterdayISO();
   console.log(`[cron] ${new Date().toISOString()} — daily ingest for ${date} …`);
-  try {
-    const batch = await readFromApi({
-      base: env.ECLASS_API_BASE,
-      fromDate: date,
-      toDate: date,
-    });
-    const result = await loadBatch(batch, { mode: "daily", date });
-    console.log("[cron] done:", result);
-  } catch (err) {
-    console.error("[cron] FAILED:", err instanceof Error ? err.message : err);
-  }
+  const batch = await readFromApi({
+    base: env.ECLASS_API_BASE,
+    fromDate: date,
+    toDate: date,
+  });
+  const result = await loadBatch(batch, { mode: "daily", date });
+  console.log("[cron] done:", result);
+  return result;
 }
 
 let task: cron.ScheduledTask | null = null;
@@ -62,7 +69,18 @@ function register(): void {
   if (signature === current) return; // unchanged — nothing to do
 
   task?.stop();
-  task = cron.schedule(schedule, () => void runDailyIngest(), { timezone });
+  task = cron.schedule(
+    schedule,
+    () => {
+      // node-cron is fire-and-forget; runDailyIngest() now throws on failure, so
+      // catch here to keep a failed run from becoming an unhandled rejection that
+      // could crash the long-lived process.
+      void runDailyIngest().catch((err) =>
+        console.error("[cron] FAILED:", err instanceof Error ? err.message : err),
+      );
+    },
+    { timezone },
+  );
   current = signature;
   console.log(`[cron] scheduled "${schedule}" (${timezone}) — auto-ingests yesterday.`);
 }

@@ -30,8 +30,17 @@ router.get(
       return;
     }
 
-    await runDailyIngest();
-    res.json({ ok: true, ranAt: new Date().toISOString() });
+    // runDailyIngest() throws on failure (API fetch error, DB refused, timeout).
+    // Report the real outcome so a failed run is a non-2xx in Vercel's cron logs
+    // instead of a silent HTTP 200 that ingested nothing.
+    try {
+      const result = await runDailyIngest();
+      res.json({ ok: true, ranAt: new Date().toISOString(), result });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("[cron] daily-ingest endpoint FAILED:", message);
+      res.status(500).json({ ok: false, ranAt: new Date().toISOString(), error: message });
+    }
   }),
 );
 
