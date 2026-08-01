@@ -62,7 +62,10 @@ export interface RawMcq {
   userId: number;
   course: string | null;
   subject: string | null;
+  /** Repaired chapter name — see ingest/chapterRepair.ts. */
   chapter: string | null;
+  /** Exactly what the source sent, before the chapter repair. Set by the loader. */
+  chapterRaw?: string | null;
   totalQuestion: number;
   rightQuestionCount: number;
   totalMarks: number;
@@ -73,6 +76,11 @@ export interface RawMcq {
   timeSpent: string | null;        // duration 'H:MM:SS'
 }
 
+/** The three independent source reports. */
+export type ReportName = "logins" | "videos" | "mcq";
+
+export const ALL_REPORTS: ReportName[] = ["logins", "videos", "mcq"];
+
 export interface IngestBatch {
   users: RawUser[];
   logins: RawLogin[];
@@ -81,4 +89,13 @@ export interface IngestBatch {
   institutes: RawInstitute[];
   mediums: RawMedium[];
   schools: RawSchool[];
+  /**
+   * Which reports this batch actually carries. In 'daily' mode the loader only
+   * DELETEs the tables named here — a report that failed to fetch must keep the
+   * rows it already has rather than being wiped and not replaced. Undefined
+   * means "all three" (the Excel source always has everything).
+   */
+  reportsLoaded?: ReportName[];
+  /** Reports that failed to fetch, for logging and partial-run reporting. */
+  failures?: Array<{ report: ReportName; error: string }>;
 }

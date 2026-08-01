@@ -26,9 +26,7 @@ router.get(
     });
     const [summaryRows] = await pool.query<any[]>(
       `SELECT COALESCE(SUM(vu.total_view_count), 0)                        AS videoViews,
-              COALESCE(SUM(TIME_TO_SEC(vu.total_view_duration)), 0) * 1000 AS videoWatchMs,
-              COUNT(DISTINCT vu.user_id)                                   AS uniqueStudents,
-              COUNT(DISTINCT vu.chapter)                                   AS chapters
+              COALESCE(SUM(TIME_TO_SEC(vu.total_view_duration)), 0) * 1000 AS videoWatchMs
        FROM video_usage vu
        JOIN users u ON u.user_id = vu.user_id
        ${video.where ? video.where + " AND " : " WHERE "}vu.subject = ?`,
@@ -75,6 +73,49 @@ router.get(
        ${mcq.where ? mcq.where + " AND " : " WHERE "}mr.subject = ?
        GROUP BY mr.chapter`,
       [...mcq.params, subject],
+    );
+
+    // Students and chapters count video AND MCQ activity: a subject that was
+    // only ever quizzed used to report 0 students / 0 chapters while its own
+    // chapter breakdown below listed the attempts (client report).
+    // DISTINCT over the UNION counts a student who did both exactly once.
+    const [reachRows] = await pool.query<any[]>(
+      `SELECT COUNT(DISTINCT user_id) AS uniqueStudents,
+              COUNT(DISTINCT chapter) AS chapters
+       FROM (
+         SELECT vu.user_id AS user_id, vu.chapter AS chapter
+           FROM video_usage vu
+           JOIN users u ON u.user_id = vu.user_id
+           ${video.where ? video.where + " AND " : " WHERE "}vu.subject = ?
+         UNION ALL
+         SELECT mr.user_id, mr.chapter
+           FROM mcq_report mr
+           JOIN users u ON u.user_id = mr.user_id
+           ${mcq.where ? mcq.where + " AND " : " WHERE "}mr.subject = ?
+       ) t`,
+      [...video.params, subject, ...mcq.params, subject],
+    );
+
+    // Distinct (chapter, student) pairs across BOTH reports. The per-chapter
+    // student count has to come from here, not from video_usage alone: a chapter
+    // that was only quizzed showed "0 students" next to its MCQ attempts, while
+    // the student table right below it listed those very students.
+    // UNION (not UNION ALL) drops the duplicate pair when a student both watched
+    // and attempted, so nobody is counted twice.
+    const [chapterStudentRows] = await pool.query<any[]>(
+      `SELECT chapter, user_id AS userId
+       FROM (
+         SELECT vu.chapter AS chapter, vu.user_id AS user_id
+           FROM video_usage vu
+           JOIN users u ON u.user_id = vu.user_id
+           ${video.where ? video.where + " AND " : " WHERE "}vu.subject = ?
+         UNION
+         SELECT mr.chapter, mr.user_id
+           FROM mcq_report mr
+           JOIN users u ON u.user_id = mr.user_id
+           ${mcq.where ? mcq.where + " AND " : " WHERE "}mr.subject = ?
+       ) t`,
+      [...video.params, subject, ...mcq.params, subject],
     );
 
     type ChapterRow = {
@@ -127,10 +168,14 @@ router.get(
         existing.mcqAttempts += Number(r.mcqAttempts);
         if (!existing.chapter) existing.chapter = cleanChapterLabel(r.chapter);
       } else {
-        // MCQ-only chapter (no video) — show the cleaned name, not the raw
-        // malformed string.
+        // MCQ-only chapter (no video). The ingest now repairs most of these
+        // (src/ingest/chapterRepair.ts), so keep a well-formed "<n>. Name" as-is
+        // — that serial number is the one the client was missing. Only the
+        // leftovers we could not repair fall back to the cleaned name.
         chapterMap.set(key, {
-          chapter: cleanChapterLabel(r.chapter),
+          chapter: /^[0-9०-९]+\s*[.)]/.test(r.chapter.trim())
+            ? r.chapter.trim()
+            : cleanChapterLabel(r.chapter),
           videoViews: 0,
           videoWatchMs: 0,
           contents: 0,
@@ -140,12 +185,26 @@ router.get(
       }
     }
 
+    // Now that every chapter row exists, set its student count from the
+    // video ∪ MCQ pairs, folded onto the same normalized chapter key.
+    const studentsByChapter = new Map<string, Set<number>>();
+    for (const r of chapterStudentRows) {
+      if (!r.chapter) continue;
+      const key = normalizeChapterKey(r.chapter);
+      let set = studentsByChapter.get(key);
+      if (!set) studentsByChapter.set(key, (set = new Set()));
+      set.add(Number(r.userId));
+    }
+    for (const [key, row] of chapterMap) {
+      row.students = studentsByChapter.get(key)?.size ?? row.students;
+    }
+
     res.json({
       subject,
       videoViews:     Number(summaryRows[0]?.videoViews ?? 0),
       videoWatchMs:   Number(summaryRows[0]?.videoWatchMs ?? 0),
-      uniqueStudents: Number(summaryRows[0]?.uniqueStudents ?? 0),
-      chapters:       Number(summaryRows[0]?.chapters ?? 0),
+      uniqueStudents: Number(reachRows[0]?.uniqueStudents ?? 0),
+      chapters:       Number(reachRows[0]?.chapters ?? 0),
       mcqAttempts:    Number(mcqRows[0]?.mcqAttempts ?? 0),
       avgPercentage:  Number(mcqRows[0]?.avgPercentage ?? 0),
       chapterBreakdown: [...chapterMap.values()],

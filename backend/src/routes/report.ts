@@ -14,14 +14,51 @@ const HEADER_STYLE = {
   alignment: { vertical: "center" },
 } as const;
 
-// Style every cell in the header row (row 0) of a worksheet — bold + fill.
-function boldHeaderRow(ws: xlsx.WorkSheet): void {
-  const range = xlsx.utils.decode_range(ws["!ref"] ?? "A1");
+// Column width bounds for the auto-fit below. Chapter and content names in the
+// video sheet are long Marathi/Hindi titles, so the ceiling stops one column
+// from pushing every other column off screen.
+const MIN_COL_WIDTH = 10;
+const MAX_COL_WIDTH = 42;
+
+/**
+ * Finish a worksheet before it goes into the workbook: styled header row,
+ * AutoFilter on the header, and auto-fitted column widths.
+ *
+ * The AutoFilter is not just cosmetic. Without it the only way to sort a
+ * downloaded sheet is to select a bare column and sort that — and Google Sheets
+ * (unlike Excel, which prompts to expand the selection) reorders that column
+ * ALONE with no warning. That silently shears "Enrollment ID" away from the rest
+ * of its row, so rows appear to belong to the wrong student while every other
+ * value stays put. Sorting through the header dropdown always moves whole rows.
+ */
+function finishSheet(ws: xlsx.WorkSheet): void {
+  const ref = ws["!ref"] ?? "A1";
+  const range = xlsx.utils.decode_range(ref);
+
   for (let c = range.s.c; c <= range.e.c; c++) {
     const addr = xlsx.utils.encode_cell({ r: range.s.r, c });
     const cell = ws[addr];
     if (cell) cell.s = { ...(cell.s ?? {}), ...HEADER_STYLE };
   }
+
+  ws["!autofilter"] = { ref };
+
+  // Width from the widest rendered value per column — `w` is the formatted text
+  // when SheetJS produced one, otherwise fall back to the raw value.
+  const cols: Array<{ wch: number }> = [];
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    let widest = 0;
+    for (let r = range.s.r; r <= range.e.r; r++) {
+      const cell = ws[xlsx.utils.encode_cell({ r, c })];
+      if (!cell) continue;
+      const text = cell.w ?? String(cell.v ?? "");
+      if (text.length > widest) widest = text.length;
+    }
+    cols.push({
+      wch: Math.min(MAX_COL_WIDTH, Math.max(MIN_COL_WIDTH, widest + 2)),
+    });
+  }
+  ws["!cols"] = cols;
 }
 
 const router = Router();
@@ -177,7 +214,7 @@ router.get(
       "Gender", "Medium", "Login Date", "Login Time", "Logout Date",
       "Logout Time", "Session Time",
     ]);
-    boldHeaderRow(loginWs);
+    finishSheet(loginWs);
     xlsx.utils.book_append_sheet(wb, loginWs, "Login History");
 
     const videoWs = sheet(videoRows, [
@@ -186,7 +223,7 @@ router.get(
       "Content Type", "Total View Duration", "Total View Count",
       "Last Access Date", "Last Access Time",
     ]);
-    boldHeaderRow(videoWs);
+    finishSheet(videoWs);
     xlsx.utils.book_append_sheet(wb, videoWs, "Video Usage");
 
     const mcqWs = sheet(mcqRows, [
@@ -195,7 +232,7 @@ router.get(
       "Right Answers", "Total Marks", "Marks Obtained", "Percentage",
       "Attempted Date", "Attempted Time", "Time Spent",
     ]);
-    boldHeaderRow(mcqWs);
+    finishSheet(mcqWs);
     xlsx.utils.book_append_sheet(wb, mcqWs, "MCQ Report");
 
     const buf = xlsx.write(wb, { type: "buffer", bookType: "xlsx" });

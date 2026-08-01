@@ -1,6 +1,16 @@
 import type { PoolConnection } from "mysql2/promise";
 import { pool } from "../db.js";
-import type { IngestBatch } from "./types.js";
+import { ALL_REPORTS, type IngestBatch, type ReportName } from "./types.js";
+import {
+  buildChapterCatalog,
+  emptyStats,
+  formatStats,
+  looksTruncated,
+  repairChapter,
+  type CatalogRow,
+  type ChapterCatalog,
+  type RepairStats,
+} from "./chapterRepair.js";
 
 export type IngestMode = "replace" | "append" | "daily";
 
@@ -18,6 +28,12 @@ export interface LoadResult {
   mediums: number;
   schools: number;
   mode: IngestMode;
+  /** Outcome counts for the MCQ chapter repair (see ingest/chapterRepair.ts). */
+  chapterRepair: RepairStats;
+  /** Reports this run actually touched. Fewer than three = partial run. */
+  reportsLoaded: ReportName[];
+  /** Reports that failed to fetch; their existing rows were left alone. */
+  failures: Array<{ report: ReportName; error: string }>;
 }
 
 /**
@@ -58,9 +74,27 @@ export async function loadBatch(
       if (!opts.date) throw new Error("daily mode requires opts.date (YYYY-MM-DD)");
       // Re-loading a day: delete that day's rows then re-insert. AUTO_INCREMENT
       // is intentionally NOT reset — ids keep climbing as new data arrives.
-      await conn.query("DELETE FROM login_history WHERE login_date = ?", [opts.date]);
-      await conn.query("DELETE FROM video_usage   WHERE last_access_date = ?", [opts.date]);
-      await conn.query("DELETE FROM mcq_report     WHERE attempted_date = ?", [opts.date]);
+      //
+      // Only the reports we actually fetched are cleared. If the VideoUsage call
+      // failed while Login and MCQ succeeded, wiping video_usage here would turn
+      // a temporary fetch error into permanent data loss for that date: deleted
+      // and never replaced. A report that isn't in `reportsLoaded` keeps its rows.
+      const loaded = batch.reportsLoaded ?? ALL_REPORTS;
+      if (loaded.includes("logins")) {
+        await conn.query("DELETE FROM login_history WHERE login_date = ?", [opts.date]);
+      }
+      if (loaded.includes("videos")) {
+        await conn.query("DELETE FROM video_usage   WHERE last_access_date = ?", [opts.date]);
+      }
+      if (loaded.includes("mcq")) {
+        await conn.query("DELETE FROM mcq_report     WHERE attempted_date = ?", [opts.date]);
+      }
+      if (loaded.length < ALL_REPORTS.length) {
+        console.warn(
+          `[ingest] partial load for ${opts.date}: only [${loaded.join(", ")}] — ` +
+            "the other report(s) keep their existing rows.",
+        );
+      }
     }
 
     if (batch.institutes.length > 0) await upsertInstitutes(conn, batch);
@@ -70,6 +104,13 @@ export async function loadBatch(
 
     if (batch.logins.length > 0) await insertLogins(conn, batch);
     if (batch.videos.length > 0) await insertVideos(conn, batch);
+
+    // Videos are inserted BEFORE this so the chapter catalogue also sees the
+    // chapter names that arrived in this very batch (same transaction).
+    const chapterRepair = batch.mcq.length > 0
+      ? await repairMcqChapters(conn, batch)
+      : emptyStats();
+
     if (batch.mcq.length > 0)    await insertMcq(conn, batch);
 
     await conn.commit();
@@ -82,6 +123,9 @@ export async function loadBatch(
       mediums:    batch.mediums.length,
       schools:    batch.schools.length,
       mode,
+      chapterRepair,
+      reportsLoaded: batch.reportsLoaded ?? ALL_REPORTS,
+      failures:      batch.failures ?? [],
     };
   } catch (err) {
     await conn.rollback();
@@ -185,18 +229,80 @@ async function insertVideos(conn: PoolConnection, batch: IngestBatch): Promise<v
 async function insertMcq(conn: PoolConnection, batch: IngestBatch): Promise<void> {
   const sql =
     `INSERT INTO mcq_report
-       (user_id, course, subject, chapter,
+       (user_id, course, subject, chapter, chapter_raw,
         total_question, right_question_count, total_marks, marks_obtained, percentage,
         attempted_date, attempted_time, time_spent)
      VALUES ?`;
   for (const chunk of chunked(batch.mcq, 1000)) {
     const values = chunk.map((r) => [
-      r.userId, r.course, r.subject, r.chapter,
+      r.userId, r.course, r.subject, r.chapter, r.chapterRaw ?? r.chapter,
       r.totalQuestion, r.rightQuestionCount, r.totalMarks, r.marksObtained, r.percentage,
       r.attemptedDate, r.attemptedTime, r.timeSpent,
     ]);
     await conn.query(sql, [values]);
   }
+}
+
+/**
+ * The MCQ endpoint returns chapter names with the first character eaten (and
+ * multi-chapter attempts glued together) — see ingest/chapterRepair.ts. Rewrite
+ * `chapter` from the video_usage chapter catalogue, keeping what upstream
+ * actually sent in `chapterRaw` so the repair stays auditable and re-runnable.
+ */
+async function repairMcqChapters(
+  conn: PoolConnection,
+  batch: IngestBatch,
+): Promise<RepairStats> {
+  const stats = emptyStats();
+
+  // Check the API first. If it is sending chapter numbers properly, store what
+  // it sends and skip the repair entirely — good data is never second-guessed.
+  if (!looksTruncated(batch.mcq)) {
+    for (const row of batch.mcq) {
+      row.chapterRaw = row.chapter;
+      stats.healthy++;
+    }
+    console.log(
+      "[ingest] mcq chapter numbers look correct upstream — repair skipped " +
+        `(${stats.healthy} rows)`,
+    );
+    return stats;
+  }
+
+  const catalog = await loadChapterCatalog(conn, batch);
+
+  for (const row of batch.mcq) {
+    row.chapterRaw = row.chapter;
+    const { chapter, kind } = repairChapter(row.course, row.subject, row.chapter, catalog);
+    row.chapter = chapter;
+    stats[kind]++;
+  }
+
+  const changed = stats.restored + stats.split + stats.title;
+  if (changed > 0 || stats.unmatched > 0 || stats.ambiguous > 0) {
+    console.log(`[ingest] mcq chapter repair: ${formatStats(stats)}`);
+  }
+  return stats;
+}
+
+/**
+ * Chapter catalogue = every distinct (course, subject, chapter) video_usage has
+ * ever seen, plus this batch's videos. Read inside the caller's transaction so
+ * rows inserted moments ago are visible.
+ */
+async function loadChapterCatalog(
+  conn: PoolConnection,
+  batch: IngestBatch,
+): Promise<ChapterCatalog> {
+  const [rows] = await conn.query<any[]>(
+    `SELECT DISTINCT course, subject, chapter
+       FROM video_usage
+      WHERE chapter IS NOT NULL AND chapter <> ''`,
+  );
+  const fromDb: CatalogRow[] = rows.map((r) => ({
+    course: r.course, subject: r.subject, chapter: r.chapter,
+  }));
+  return buildChapterCatalog([...fromDb, ...batch.videos]);
 }
 
 function chunked<T>(arr: T[], size: number): T[][] {

@@ -123,6 +123,10 @@ async function main(): Promise<void> {
     await addColumnIfMissing(conn, "users", "institute_id", "INT NULL", "idx_institute");
     await addColumnIfMissing(conn, "users", "medium_id", "INT NULL", "idx_medium");
 
+    // 4b. Migration 002 — mcq_report.chapter_raw keeps the untouched upstream
+    //     chapter string next to the repaired one (see ingest/chapterRepair.ts).
+    await addColumnIfMissing(conn, "mcq_report", "chapter_raw", "VARCHAR(1024) NULL");
+
     // 5. Audit columns on every table: created_on / updated_on / is_deleted / is_active.
     //    created_on gets an index (drives date-based deletes/rollbacks).
     const AUDIT_TABLES = ["users", "login_history", "video_usage", "mcq_report", "institutes", "mediums"];

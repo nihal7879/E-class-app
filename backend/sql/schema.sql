@@ -132,11 +132,16 @@ CREATE TABLE video_usage (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE mcq_report (
-  id                    BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  user_id               INT          NOT NULL,
-  course                VARCHAR(512) NULL,
-  subject               VARCHAR(512) NULL,
-  chapter               VARCHAR(512) NULL,
+  id                    BIGINT        NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  user_id               INT           NOT NULL,
+  course                VARCHAR(512)  NULL,
+  subject               VARCHAR(512)  NULL,
+  -- Repaired chapter name: the upstream MCQ endpoint drops the first character
+  -- (killing the serial number) and glues multi-chapter attempts together, so
+  -- the ingest rebuilds this from the video_usage chapter catalogue.
+  -- See src/ingest/chapterRepair.ts and sql/migrations/002_mcq_chapter_raw.sql.
+  chapter               VARCHAR(1024) NULL,
+  chapter_raw           VARCHAR(1024) NULL,   -- exactly what upstream sent
   total_question        INT          NULL DEFAULT 0,
   right_question_count  INT          NULL DEFAULT 0,
   total_marks           INT          NULL DEFAULT 0,

@@ -131,6 +131,30 @@ router.get(
       mcq.params,
     );
 
+    // "Students" and "Chapters" must count MCQ activity too. Taking them from
+    // video_usage alone made a subject that was only ever quizzed read
+    // "MCQ ATTEMPTS 8" next to "STUDENTS 0 / CHAPTERS 0" (client report), while
+    // drilling into the same subject listed the students who attempted it.
+    // COUNT(DISTINCT ...) over the UNION counts a student who did both once.
+    const [reachRows] = await pool.query<any[]>(
+      `SELECT subject,
+              COUNT(DISTINCT user_id) AS students,
+              COUNT(DISTINCT chapter) AS chapters
+       FROM (
+         SELECT vu.subject AS subject, vu.user_id AS user_id, vu.chapter AS chapter
+           FROM video_usage vu
+           JOIN users u ON u.user_id = vu.user_id
+           ${video.where}
+         UNION ALL
+         SELECT mr.subject, mr.user_id, mr.chapter
+           FROM mcq_report mr
+           JOIN users u ON u.user_id = mr.user_id
+           ${mcq.where}
+       ) t
+       GROUP BY subject`,
+      [...video.params, ...mcq.params],
+    );
+
     type Row = {
       subject: string;
       videoViews: number;
@@ -155,8 +179,6 @@ router.get(
       const x = get(r.subject);
       x.videoViews = Number(r.videoViews);
       x.videoWatchMs = Number(r.videoWatchMs);
-      x.chapters = Number(r.chapters);
-      x.students = Number(r.students);
     }
     for (const r of mcqRows) {
       if (!r.subject) continue;
@@ -164,10 +186,20 @@ router.get(
       x.mcqAttempts = Number(r.mcqAttempts);
       x.avgPercentage = Number(r.avgPercentage);
     }
+    for (const r of reachRows) {
+      if (!r.subject) continue;
+      const x = get(r.subject);
+      x.students = Number(r.students);
+      x.chapters = Number(r.chapters);
+    }
 
     res.json({
       course,
-      items: [...map.values()].sort((a, b) => b.videoViews - a.videoViews),
+      // MCQ-only subjects have no video views — fall back to attempts so they
+      // don't always sink to the bottom of the list.
+      items: [...map.values()].sort(
+        (a, b) => b.videoViews - a.videoViews || b.mcqAttempts - a.mcqAttempts,
+      ),
     });
   }),
 );
@@ -224,6 +256,25 @@ router.get(
       mcq.params,
     );
 
+    // Same reasoning as the subjects list: a school whose students only
+    // attempted MCQs would otherwise show 0 students next to its attempts.
+    const [reachRows] = await pool.query<any[]>(
+      `SELECT school, COUNT(DISTINCT user_id) AS students
+       FROM (
+         SELECT u.school AS school, vu.user_id AS user_id
+           FROM video_usage vu
+           JOIN users u ON u.user_id = vu.user_id
+           ${video.where}
+         UNION ALL
+         SELECT u.school, mr.user_id
+           FROM mcq_report mr
+           JOIN users u ON u.user_id = mr.user_id
+           ${mcq.where}
+       ) t
+       GROUP BY school`,
+      [...video.params, ...mcq.params],
+    );
+
     type Row = {
       school: string;
       students: number;
@@ -242,7 +293,6 @@ router.get(
     for (const r of videoRows) {
       if (!r.school) continue;
       const x = get(r.school);
-      x.students = Number(r.students);
       x.videoViews = Number(r.videoViews);
       x.videoWatchMs = Number(r.videoWatchMs);
     }
@@ -252,10 +302,16 @@ router.get(
       x.mcqAttempts = Number(r.mcqAttempts);
       x.avgPercentage = Number(r.avgPercentage);
     }
+    for (const r of reachRows) {
+      if (!r.school) continue;
+      get(r.school).students = Number(r.students);
+    }
 
     res.json({
       course,
-      items: [...map.values()].sort((a, b) => b.videoViews - a.videoViews),
+      items: [...map.values()].sort(
+        (a, b) => b.videoViews - a.videoViews || b.mcqAttempts - a.mcqAttempts,
+      ),
     });
   }),
 );

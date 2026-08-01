@@ -139,6 +139,85 @@ The whole load runs **inside one transaction** — a SQL failure halfway through
 
 ---
 
+## Known upstream defect — MCQ chapter serial numbers
+
+**`GET /api/v1/Report/MCQ` returns `Chapter` with its first character missing.** Confirmed
+against the live endpoint on 2026-07-29:
+
+| Upstream sends | Correct value |
+|---|---|
+| `". आनुवंशिकता व उत्क्रांती"` | `"1. आनुवंशिकता व उत्क्रांती"` |
+| `"0. आप्पांचे पत्र"` | `"10. आप्पांचे पत्र"` |
+| `"5. एक होती समई"` | `"15. एक होती समई"` |
+| `". Living World...2. Health and Diseases3. Force and Pressure"` | three chapters, first one headless |
+
+When one attempt covers several chapters the names are also concatenated **without a
+separator** — the signature of a "strip the leading separator" that runs on a string built
+without separators, so it eats a real character instead.
+
+`/api/v1/Report/VideoUsage` is **not** affected (`"16. Heredity and Variation"` arrives
+intact), and the old manual Excel exports were correct — so this is an MCQ-endpoint bug,
+not an ingest bug. **It still needs fixing at the source**; everything below is a
+workaround. Note the damage is worse than a missing digit: `15.` arriving as `5.` is a
+*wrong* chapter number, which is why the client saw it in the downloaded MCQ report.
+
+**Affected range: everything.** The oldest MCQ record the API serves is **2023-04-26**, and
+the defect is present in every month through today. There is no good date window to fall
+back on:
+
+```bash
+# broken — chapter number missing, from the very first record onwards
+curl "https://dashboard1.sundarameclass.com/api/v1/Report/MCQ?fromDate=2023-04-26%2000:00&toDate=2023-04-30%2023:59:59"
+#   → "Chapter": ".मूलद्रव्यांचे आवर्ती वर्गीकरण "
+
+# still broken today
+curl "https://dashboard1.sundarameclass.com/api/v1/Report/MCQ?fromDate=2026-07-27%2000:00&toDate=2026-07-27%2023:59:59"
+#   → "Chapter": ". आनुवंशिकता व उत्क्रांती"
+
+# same chapters, same day, from VideoUsage — correct
+curl "https://dashboard1.sundarameclass.com/api/v1/Report/VideoUsage?fromDate=2026-07-27%2000:00&toDate=2026-07-27%2023:59:59"
+#   → "Chapter": "6. ऐ सखि ! (पूरक पठन)"
+```
+
+### The workaround
+
+**It checks before it repairs.** `looksTruncated()` scans the batch for the unmistakable
+signature — a chapter name starting with `.` — because that only happens when a leading
+digit was eaten. If the signature is absent, the API is healthy, the repair is skipped
+wholesale, and whatever the API sent is stored verbatim (`healthy` in the stats). So the
+day the endpoint is fixed this code steps aside on its own with no edit required.
+
+When the signature IS present, `src/ingest/chapterRepair.ts` treats `video_usage` as a chapter catalogue — it holds the
+same chapter names, un-truncated, under the same `(course, subject)` — and puts the missing
+head character back. The loader runs it after inserting videos (so the catalogue also sees
+chapters that arrived in the same batch) and before inserting MCQ rows:
+
+| Outcome | Meaning |
+|---|---|
+| `healthy` | the batch shows no truncation — API trusted, repair never ran |
+| `exact` | already a known chapter name — left untouched, so this becomes a no-op once the API is fixed |
+| `restored` | exactly one catalogue entry `E` satisfies `E.slice(1) === raw` |
+| `split` | a glued multi-chapter string, re-emitted as `"1. A, 2. B, 3. C"` |
+| `title` | same chapter title, serial taken from the catalogue |
+| `ambiguous` / `unmatched` | **left exactly as upstream sent it** — no serial number is ever invented |
+
+Every step requires a *unique* candidate. `mcq_report.chapter_raw` keeps the untouched
+upstream string, so the repair is auditable and always re-runnable from the original.
+Ingest logs a one-line summary: `[ingest] mcq chapter repair: restored=7602 split=253 …`
+
+### Backfilling rows ingested before the fix
+
+```bash
+npm run db:repair-chapters -- --dry-run   # report only, writes nothing
+npm run db:repair-chapters                # apply
+```
+
+Adds `mcq_report.chapter_raw` if missing (migration `002`), then repairs every row from its
+original value. Idempotent — a second run writes nothing. Applied to production on
+2026-07-29: **7,855 of 7,962 rows repaired, 93 left as-is** (no unique catalogue match).
+
+---
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
@@ -148,6 +227,8 @@ The whole load runs **inside one transaction** — a SQL failure halfway through
 | `parsed: 0 users, 0 logins, 0 videos, 0 mcq` from Excel | wrong sheet names or empty sheets | Open the file in Excel and confirm sheet names match the list above |
 | Lots of `NULL` `login_date` rows | Excel cells stored as Excel-native dates (not strings) | The reader uses `raw: false` which usually converts them; if not, open the file and re-save the date column as text or fix the column type |
 | `readFromApi() not yet implemented` | tried `--source=api` before implementing | Implement `sources/api.ts` or fall back to `--source=excel` |
+| MCQ report shows no chapter number, or the wrong one | upstream MCQ endpoint truncation (see above) | `npm run db:repair-chapters`; chase the fix at the API |
+| `Unknown column 'chapter_raw' in 'field list'` on ingest | migration `002` not applied to this DB | `npm run db:repair-chapters` (adds the column, then backfills) |
 
 ---
 

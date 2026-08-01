@@ -43,6 +43,18 @@ export async function runDailyIngest(): Promise<LoadResult> {
   });
   const result = await loadBatch(batch, { mode: "daily", date });
   console.log("[cron] done:", result);
+
+  // A report that failed to fetch no longer takes the other two down with it —
+  // whatever came back is already committed above. But the run is still not a
+  // clean success, so raise it AFTER the commit: the HTTP cron endpoint answers
+  // non-2xx and the failure is visible instead of passing as a green run that
+  // quietly skipped a report.
+  if (result.failures.length > 0) {
+    throw new Error(
+      `Partial ingest for ${date}: loaded [${result.reportsLoaded.join(", ")}], ` +
+        `failed ${result.failures.map((f) => `${f.report} (${f.error})`).join("; ")}`,
+    );
+  }
   return result;
 }
 

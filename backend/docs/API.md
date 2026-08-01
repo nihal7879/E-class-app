@@ -274,13 +274,20 @@ Per-subject breakdown inside one course. Feeds `CourseSubjectsPage`.
       "videoViews": 4210,
       "videoWatchMs": 8123456789,
       "chapters": 6,
+      "students": 412,
       "mcqAttempts": 612,
       "avgPercentage": 69.1
     }
   ]
 }
 ```
-Sorted by `videoViews` desc.
+Sorted by `videoViews` desc, then `mcqAttempts` desc so MCQ-only subjects (no video
+views at all) don't always sink to the bottom.
+
+`students` and `chapters` count **video and MCQ activity together** — `COUNT(DISTINCT …)`
+over the union of `video_usage` and `mcq_report`, so a student who did both is counted
+once. Counting videos alone made a subject that was only ever quizzed report
+`"students": 0, "chapters": 0` next to a non-zero `mcqAttempts`.
 
 ---
 
@@ -307,7 +314,7 @@ Subject-level KPIs + per-chapter breakdown. Feeds `SubjectDetailPage`.
   "avgPercentage": 69.1,
   "chapterBreakdown": [
     {
-      "chapter": "Newton's Laws",
+      "chapter": "1. Newton's Laws",
       "videoViews": 1042,
       "videoWatchMs": 2000000000,
       "contents": 8
@@ -316,6 +323,10 @@ Subject-level KPIs + per-chapter breakdown. Feeds `SubjectDetailPage`.
 }
 ```
 `chapterBreakdown` is sorted by `videoViews` desc.
+
+`uniqueStudents` and `chapters` span video **and** MCQ activity (same union rule as
+`/api/courses/:course/subjects`) — an MCQ-only subject used to report 0 students while its
+own `chapterBreakdown` listed the attempts.
 
 ---
 
