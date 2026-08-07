@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import {
   useDailyActivity,
   useSchoolCourses,
+  useSchoolDetail,
   useSchoolSubjects,
   useStudents,
 } from "@/lib/hooks";
@@ -40,17 +41,22 @@ export default function SchoolDetailPage() {
   const dailyApi = useDailyActivity(extra);
   const coursesApi = useSchoolCourses(school);
   const subjectsApi = useSchoolSubjects(school);
+  // School-wide totals aggregated in SQL. Preferred over summing the students
+  // list for video/MCQ, which is capped at 1000 rows and would under-count.
+  const detailApi = useSchoolDetail(school);
 
   const students: StudentStat[] = useMemo(
     () =>
       (studentsApi.data?.items ?? []).map((s) => ({
         enrollmentId: s.enrollmentId ?? String(s.userId),
         studentName: s.studentName ?? "",
-        // "Session" = login with session_time >= 1 min. Instant logouts are
-        // excluded so the count reflects real watching activity.
+        // "Session" = login with any recorded time (>= 1 sec). Only
+        // zero-duration rows are excluded.
         sessions: s.activeSessions,
         totalSessionMs: s.totalSessionMs,
         logins: s.logins,
+        videoWatchMs: s.videoWatchMs,
+        mcqAttempts: s.mcqAttempts,
       })),
     [studentsApi.data],
   );
@@ -74,22 +80,32 @@ export default function SchoolDetailPage() {
   const dailyLoading = dailyApi.loading && !dailyApi.data;
   const kpisLoading =
     (studentsApi.loading && !studentsApi.data) ||
-    (coursesApi.loading && !coursesApi.data);
+    (coursesApi.loading && !coursesApi.data) ||
+    (detailApi.loading && !detailApi.data);
 
+  // Top/low lists rank on video watch time, not login session time.
   const sortedDesc = useMemo(
-    () => [...students].sort((a, b) => b.totalSessionMs - a.totalSessionMs),
+    () => [...students].sort((a, b) => b.videoWatchMs - a.videoWatchMs),
     [students],
   );
-  const topStudents = sortedDesc.slice(0, 5);
-  const lowStudents = sortedDesc
-    .filter((s) => s.totalSessionMs > 0)
-    .slice(-5)
-    .reverse();
+  // Zero is never a ranking — a student with no watch time isn't a "top" or a
+  // "low" performer, they're absent from the metric. Both lists drop them.
+  const watched = sortedDesc.filter((s) => s.videoWatchMs > 0);
+  const topStudents = watched.slice(0, 5);
+  const lowStudents = watched.slice(-5).reverse();
+
+  // Same rule for the per-student chart: a student with no video and no MCQ
+  // activity contributes two empty bars and nothing else.
+  const activeStudents = useMemo(
+    () => students.filter((s) => s.videoWatchMs > 0 || s.mcqAttempts > 0),
+    [students],
+  );
 
   const totalSessions = students.reduce((a, s) => a + s.sessions, 0);
-  const totalLogins = students.reduce((a, s) => a + s.logins, 0);
-  const totalMs = students.reduce((a, s) => a + s.totalSessionMs, 0);
-  const totalHours = totalMs / 3_600_000;
+  const totalMcqAttempts = detailApi.data?.mcqAttempts ?? 0;
+  // Video watch time (video_usage.total_view_duration), NOT login session
+  // time — this tile answers "how much video did this school actually watch".
+  const videoHours = (detailApi.data?.videoWatchMs ?? 0) / 3_600_000;
 
   const coursesHref = school ? `/school/${toSchoolId(school)}/courses` : "#";
 
@@ -142,9 +158,9 @@ export default function SchoolDetailPage() {
         </Link>
         <KpiTile
           tone="rose"
-          label="Total logins"
-          value={formatNumber(totalLogins)}
-          icon={<KeyIcon />}
+          label="Total MCQ attempts"
+          value={formatNumber(totalMcqAttempts)}
+          icon={<McqIcon />}
         />
         <KpiTile
           tone="violet"
@@ -154,8 +170,8 @@ export default function SchoolDetailPage() {
         />
         <KpiTile
           tone="amber"
-          label="Total usage"
-          value={totalHours >= 10 ? totalHours.toFixed(0) : totalHours.toFixed(1)}
+          label="Total video usage"
+          value={videoHours >= 10 ? videoHours.toFixed(0) : videoHours.toFixed(1)}
           unit="hrs"
           icon={<ClockIcon />}
         />
@@ -181,9 +197,9 @@ export default function SchoolDetailPage() {
       <div>
         <SectionHeader
           title="Per-student breakdown"
-          description="Sessions and usage time by Enrollment ID."
+          description="Video usage and MCQ attempts by Enrollment ID."
         />
-        <StudentBreakdownChart students={students} loading={studentsLoading} />
+        <StudentBreakdownChart students={activeStudents} loading={studentsLoading} />
       </div>
 
       <div>
@@ -194,17 +210,17 @@ export default function SchoolDetailPage() {
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           <StudentList
             title="Top usage students"
-            subtitle="Highest total time logged in"
+            subtitle="Most video watch time"
             students={topStudents}
             tone="emerald"
             loading={studentsLoading}
           />
           <StudentList
             title="Low usage students"
-            subtitle="Active but lowest total time"
+            subtitle="Least video watch time, excluding students with none"
             students={lowStudents}
             tone="rose"
-            emptyText="No students with non-zero usage to rank"
+            emptyText="No students with video watch time to rank"
             loading={studentsLoading}
           />
         </div>
@@ -317,7 +333,7 @@ function UsersIcon() {
     </svg>
   );
 }
-function KeyIcon() {
+function McqIcon() {
   return (
     <svg
       width="20"
@@ -329,10 +345,10 @@ function KeyIcon() {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <circle cx="8" cy="15" r="4" />
-      <path d="m10.85 12.15 7.65-7.65" />
-      <path d="m18 8 2 2" />
-      <path d="m15 5 3 3" />
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="m7 10 2 2 3-3" />
+      <path d="M14 11h4" />
+      <path d="M7 16h11" />
     </svg>
   );
 }

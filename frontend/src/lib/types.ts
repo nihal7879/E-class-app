@@ -28,4 +28,6 @@ export interface StudentStat {
   sessions: number;
   totalSessionMs: number;
   logins: number;
+  videoWatchMs: number;
+  mcqAttempts: number;
 }

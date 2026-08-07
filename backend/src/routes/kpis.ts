@@ -26,14 +26,14 @@ router.get(
       divisionColumn: "u.division",
       genderColumn: "u.gender",
     });
-    // "session" = login with session_time >= 1 minute (skip instant-logout rows).
-    // "logins"  = every login_history row, raw.
+    // "session" = login with any recorded time at all (>= 1 second); only
+    // zero-duration rows are skipped. "logins" = every login_history row, raw.
     const [loginRows] = await pool.query<any[]>(
       `SELECT
-         COUNT(*)                                                   AS totalLogins,
-         SUM(CASE WHEN TIME_TO_SEC(lh.session_time) >= 60 THEN 1 ELSE 0 END) AS activeSessions,
+         COALESCE(SUM(CASE WHEN TIME_TO_SEC(lh.session_time) > 0 THEN 1 ELSE 0 END), 0) AS totalLogins,
+         SUM(CASE WHEN TIME_TO_SEC(lh.session_time) > 0 THEN 1 ELSE 0 END)  AS activeSessions,
          COALESCE(SUM(TIME_TO_SEC(lh.session_time)), 0) * 1000       AS totalSessionMs,
-         COALESCE(AVG(CASE WHEN TIME_TO_SEC(lh.session_time) >= 60
+         COALESCE(AVG(CASE WHEN TIME_TO_SEC(lh.session_time) > 0
                            THEN TIME_TO_SEC(lh.session_time) END), 0) * 1000 AS avgSessionMs
        FROM login_history lh
        JOIN users u ON u.user_id = lh.user_id

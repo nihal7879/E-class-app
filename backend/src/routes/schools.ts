@@ -24,8 +24,8 @@ router.get(
     });
     const [loginRows] = await pool.query<any[]>(
       `SELECT u.school AS school,
-              COUNT(*)                                                            AS logins,
-              SUM(CASE WHEN TIME_TO_SEC(lh.session_time) >= 60 THEN 1 ELSE 0 END) AS sessions,
+              COALESCE(SUM(CASE WHEN TIME_TO_SEC(lh.session_time) > 0 THEN 1 ELSE 0 END), 0) AS logins,
+              SUM(CASE WHEN TIME_TO_SEC(lh.session_time) > 0 THEN 1 ELSE 0 END)  AS sessions,
               COUNT(DISTINCT lh.user_id)                                          AS uniqueStudents,
               COALESCE(SUM(TIME_TO_SEC(lh.session_time)), 0) * 1000               AS totalSessionMs
        FROM login_history lh
@@ -98,7 +98,7 @@ router.get(
     };
     for (const r of loginRows) {
       const x = get(r.school);
-      x.sessions = Number(r.sessions);          // active (>= 1 min)
+      x.sessions = Number(r.sessions);          // any non-zero duration
       x.logins   = Number(r.logins);            // raw login_history rows
       x.uniqueStudents = Number(r.uniqueStudents);
       x.totalSessionMs = Number(r.totalSessionMs);
@@ -140,10 +140,10 @@ router.get(
       genderColumn: "u.gender",
     });
     const [loginRows] = await pool.query<any[]>(
-      `SELECT COUNT(*)                                                            AS totalLogins,
-              SUM(CASE WHEN TIME_TO_SEC(lh.session_time) >= 60 THEN 1 ELSE 0 END) AS activeSessions,
+      `SELECT COALESCE(SUM(CASE WHEN TIME_TO_SEC(lh.session_time) > 0 THEN 1 ELSE 0 END), 0) AS totalLogins,
+              SUM(CASE WHEN TIME_TO_SEC(lh.session_time) > 0 THEN 1 ELSE 0 END)   AS activeSessions,
               COALESCE(SUM(TIME_TO_SEC(lh.session_time)), 0) * 1000               AS totalSessionMs,
-              COALESCE(AVG(CASE WHEN TIME_TO_SEC(lh.session_time) >= 60
+              COALESCE(AVG(CASE WHEN TIME_TO_SEC(lh.session_time) > 0
                                 THEN TIME_TO_SEC(lh.session_time) END), 0) * 1000 AS avgSessionMs,
               COUNT(DISTINCT lh.user_id)                                          AS uniqueUsers
        FROM login_history lh

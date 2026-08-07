@@ -25,8 +25,10 @@ router.get(
       genderColumn: "u.gender",
     });
     const [loginRows] = await pool.query<any[]>(
+      // A login with 0 min 0 sec on the clock isn't activity — it doesn't
+      // count as a login anywhere in the dashboard.
       `SELECT lh.login_date AS date,
-              COUNT(*)                   AS logins,
+              COALESCE(SUM(CASE WHEN TIME_TO_SEC(lh.session_time) > 0 THEN 1 ELSE 0 END), 0) AS logins,
               COUNT(DISTINCT lh.user_id) AS uniqueStudents
        FROM login_history lh
        JOIN users u ON u.user_id = lh.user_id

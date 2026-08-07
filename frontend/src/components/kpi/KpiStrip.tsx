@@ -55,10 +55,10 @@ export default function KpiStrip() {
       />
       <KpiTile
         tone="rose"
-        label="Total logins"
-        value={formatNumber(k.totalLogins)}
+        label="Total MCQ attempts"
+        value={formatNumber(k.mcqAttempts)}
         hint="In selected period"
-        icon={<KeyIcon />}
+        icon={<McqIcon />}
       />
     </section>
   );
@@ -134,7 +134,7 @@ function ClockIcon() {
     </svg>
   );
 }
-function KeyIcon() {
+function McqIcon() {
   return (
     <svg
       width="20"
@@ -146,10 +146,10 @@ function KeyIcon() {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <circle cx="8" cy="15" r="4" />
-      <path d="m10.85 12.15 7.65-7.65" />
-      <path d="m18 8 2 2" />
-      <path d="m15 5 3 3" />
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="m7 10 2 2 3-3" />
+      <path d="M14 11h4" />
+      <path d="M7 16h11" />
     </svg>
   );
 }

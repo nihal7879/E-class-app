@@ -32,7 +32,7 @@ export interface FilterCatalogue {
 
 export interface KpiResponse {
   totalLogins: number;
-  activeSessions: number;       // logins with session_time >= 1 minute
+  activeSessions: number;       // logins with a non-zero session_time
   totalSessionMs: number;
   avgSessionMs: number;
   uniqueUsers: number;
@@ -237,7 +237,7 @@ export interface StudentItem {
   school: string | null;
   division: string | null;
   logins: number;
-  activeSessions: number;       // sessions where session_time >= 1 min
+  activeSessions: number;       // sessions where session_time is non-zero
   totalSessionMs: number;
   videoViews: number;
   videoWatchMs: number;

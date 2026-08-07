@@ -8,10 +8,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import type { TooltipProps } from "recharts";
+import type {
+  NameType,
+  ValueType,
+} from "recharts/types/component/DefaultTooltipContent";
 import { formatHours, formatNumber } from "@/lib/parse";
 import type { StudentStat } from "@/lib/types";
 import ChartCard from "./ChartCard";
-import { CustomTooltip } from "./Tooltip";
 import { BarChartSkeleton } from "@/components/ui/Skeleton";
 import { AXIS_COLOR, AXIS_TICK_STYLE, GRID_COLOR, GRID_DASH } from "./theme";
 
@@ -20,21 +24,21 @@ interface Props {
   loading?: boolean;
 }
 
-const SESSIONS_COLOR = "#4f46e5";
-const HOURS_COLOR = "#059669";
+const VIDEO_COLOR = "#059669";
+const MCQ_COLOR = "#4f46e5";
 
 export default function StudentBreakdownChart({ students, loading = false }: Props) {
   const data = students.map((s) => ({
     enrollmentId: s.enrollmentId,
-    sessions: s.sessions,
-    hours: s.totalSessionMs / 3_600_000,
+    videoHours: s.videoWatchMs / 3_600_000,
+    mcqAttempts: s.mcqAttempts,
     studentName: s.studentName,
   }));
 
   return (
     <ChartCard
-      title="Student Session Count & Duration"
-      subtitle="Per-student sessions and total time logged in, by Enrollment ID"
+      title="Student Video Usage & MCQ Attempts"
+      subtitle="Per-student video watch time and MCQ attempts, by Enrollment ID"
     >
       {loading && data.length === 0 ? (
         <BarChartSkeleton height={360} bars={14} />
@@ -68,36 +72,25 @@ export default function StudentBreakdownChart({ students, loading = false }: Pro
                 textAnchor="end"
               />
               <YAxis
-                yAxisId="sessions"
-                tick={{ ...AXIS_TICK_STYLE, fill: SESSIONS_COLOR }}
-                stroke={AXIS_COLOR}
-                tickLine={false}
-                axisLine={false}
-                allowDecimals={false}
-                width={40}
-              />
-              <YAxis
-                yAxisId="hours"
-                orientation="right"
-                tick={{ ...AXIS_TICK_STYLE, fill: HOURS_COLOR }}
+                yAxisId="video"
+                tick={{ ...AXIS_TICK_STYLE, fill: VIDEO_COLOR }}
                 stroke={AXIS_COLOR}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(v) => `${Number(v).toFixed(0)}h`}
                 width={40}
               />
-              <Tooltip
-                cursor={{ fill: "#f1f5f9" }}
-                content={
-                  <CustomTooltip
-                    formatter={(v, name) =>
-                      name === "Sessions"
-                        ? `${formatNumber(Number(v))} sessions`
-                        : formatHours(Number(v) * 3_600_000)
-                    }
-                  />
-                }
+              <YAxis
+                yAxisId="mcq"
+                orientation="right"
+                tick={{ ...AXIS_TICK_STYLE, fill: MCQ_COLOR }}
+                stroke={AXIS_COLOR}
+                tickLine={false}
+                axisLine={false}
+                allowDecimals={false}
+                width={40}
               />
+              <Tooltip cursor={{ fill: "#f1f5f9" }} content={<BreakdownTooltip />} />
               <Legend
                 verticalAlign="top"
                 align="right"
@@ -107,10 +100,10 @@ export default function StudentBreakdownChart({ students, loading = false }: Pro
                 iconSize={8}
               />
               <Bar
-                yAxisId="sessions"
-                dataKey="sessions"
-                name="Sessions"
-                fill={SESSIONS_COLOR}
+                yAxisId="video"
+                dataKey="videoHours"
+                name="Video Usage"
+                fill={VIDEO_COLOR}
                 radius={[4, 4, 0, 0]}
                 isAnimationActive
                 animationDuration={500}
@@ -118,10 +111,10 @@ export default function StudentBreakdownChart({ students, loading = false }: Pro
                 maxBarSize={48}
               />
               <Bar
-                yAxisId="hours"
-                dataKey="hours"
-                name="Usage Hours"
-                fill={HOURS_COLOR}
+                yAxisId="mcq"
+                dataKey="mcqAttempts"
+                name="MCQ Attempts"
+                fill={MCQ_COLOR}
                 radius={[4, 4, 0, 0]}
                 isAnimationActive
                 animationDuration={500}
@@ -132,6 +125,61 @@ export default function StudentBreakdownChart({ students, loading = false }: Pro
         </div>
       )}
     </ChartCard>
+  );
+}
+
+/**
+ * Local tooltip instead of the shared CustomTooltip: that one drops any series
+ * whose value is 0, which would silently hide "MCQ Attempts: 0" — the exact
+ * case we want visible here.
+ */
+function BreakdownTooltip({
+  active,
+  payload,
+  label,
+}: TooltipProps<ValueType, NameType>) {
+  if (!active || !payload || payload.length === 0) return null;
+  const row = payload[0]?.payload as
+    | { videoHours: number; mcqAttempts: number }
+    | undefined;
+  if (!row) return null;
+
+  return (
+    <div className="min-w-[160px] overflow-hidden rounded-xl border border-slate-200 bg-white text-[12px] shadow-cardHover">
+      <div className="border-b border-slate-100 px-3 py-1.5 text-[11px] font-semibold text-slate-600">
+        {String(label)}
+      </div>
+      <ul className="space-y-1 px-3 py-2">
+        <TooltipRow
+          color={VIDEO_COLOR}
+          name="Video Usage"
+          value={formatHours(row.videoHours * 3_600_000)}
+        />
+        <TooltipRow
+          color={MCQ_COLOR}
+          name="MCQ Attempts"
+          value={formatNumber(row.mcqAttempts)}
+        />
+      </ul>
+    </div>
+  );
+}
+
+function TooltipRow({
+  color,
+  name,
+  value,
+}: {
+  color: string;
+  name: string;
+  value: string;
+}) {
+  return (
+    <li className="flex items-center gap-2">
+      <span className="h-2 w-2 rounded-full" style={{ background: color }} />
+      <span className="max-w-[200px] truncate text-slate-600">{name}</span>
+      <span className="num ml-auto font-semibold text-slate-900">{value}</span>
+    </li>
   );
 }
 

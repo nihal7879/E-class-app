@@ -43,6 +43,7 @@ Accepted by every data endpoint (#3 onward). All are optional. Defined in `backe
 
 **Notes**
 - `login_history` has no course column — `courses` filter is **ignored** for login-derived metrics.
+- Zero-duration logins (`session_time` of `00:00:00`, i.e. an instant logout) are **excluded everywhere**. Both `logins`/`totalLogins` and `sessions`/`activeSessions` count only rows with `TIME_TO_SEC(session_time) > 0`, so the two are currently equal by construction. `avgSessionMs` averages over the same set.
 - Each endpoint applies the date filter against its own dataset's date column (login_date / last_access_date / attempted_date).
 - Invalid params return HTTP 400 with `{ error: "Invalid query parameters", details: {...} }`.
 

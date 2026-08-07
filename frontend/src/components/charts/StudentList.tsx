@@ -26,8 +26,10 @@ export default function StudentList({
       ? "bg-emerald-100 text-emerald-700"
       : "bg-rose-100 text-rose-700";
 
+  // Bars are scaled against the biggest video watch time in the list, so the
+  // top row always fills and the rest read as a share of it.
   const maxMs =
-    students.reduce((a, s) => (s.totalSessionMs > a ? s.totalSessionMs : a), 0) || 1;
+    students.reduce((a, s) => (s.videoWatchMs > a ? s.videoWatchMs : a), 0) || 1;
 
   return (
     <ChartCard title={title} subtitle={subtitle}>
@@ -53,7 +55,7 @@ export default function StudentList({
       ) : (
         <ol className="space-y-2">
           {students.map((s, i) => {
-            const share = s.totalSessionMs / maxMs;
+            const share = s.videoWatchMs / maxMs;
             return (
               <li
                 key={s.enrollmentId}
@@ -69,11 +71,20 @@ export default function StudentList({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline justify-between gap-3">
-                    <div className="truncate text-[13.5px] font-semibold text-slate-900">
-                      {s.studentName || s.enrollmentId}
+                    <div className="min-w-0 truncate">
+                      <span className="text-[13.5px] font-semibold text-slate-900">
+                        {s.studentName || s.enrollmentId}
+                      </span>
+                      {/* Skip the ID when it's already standing in for a
+                          missing name — no point printing it twice. */}
+                      {s.studentName && (
+                        <span className="num ml-1.5 text-[11.5px] font-medium text-slate-400">
+                          ({s.enrollmentId})
+                        </span>
+                      )}
                     </div>
                     <div className="num text-[13px] font-semibold text-slate-900">
-                      {formatHours(s.totalSessionMs)}
+                      {formatHours(s.videoWatchMs)}
                     </div>
                   </div>
                   <div className="mt-1.5 flex items-center gap-2">
