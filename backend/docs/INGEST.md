@@ -203,15 +203,31 @@ backfill works, the cron works.
 
 ### The schedule
 
-Hourly, on the hour (`0 * * * *`, Asia/Kolkata). Set in `src/config.ts`
-(`DEFAULT_CRON_SCHEDULE`), overridable live via `config/cron.json` or the
-`CRON_SCHEDULE` / `CRON_TZ` env vars — the file is watched, so a schedule edit needs
-neither rebuild nor restart.
+**The two hosts run on different schedules, and they must.**
 
-The scheduler starts automatically with the API server (`src/index.ts`). On Vercel there
-is no long-lived process, so Vercel Cron hits `/api/cron/daily-ingest` (alias
-`/api/cron/sync`) with `Authorization: Bearer $CRON_SECRET` instead. An hourly tick that
-lands while the previous run is still paging is **skipped**, not stacked.
+| Host | Schedule | Where it's configured |
+|---|---|---|
+| Persistent (local, VPS, Render…) | **hourly**, `0 * * * *` Asia/Kolkata | `config/cron.json`, fallback `DEFAULT_CRON_SCHEDULE` in `src/config.ts` |
+| Vercel | **daily**, `30 2 * * *` UTC = 8:00 IST | `vercel.json` → `crons` |
+
+⚠️ **Do not set the Vercel cron to hourly.** A Hobby account rejects any cron more
+frequent than once per day, and it fails at DEPLOY time, not at run time:
+
+> Hobby accounts are limited to daily cron jobs. This cron expression would run
+> more than once per day.
+
+So `0 * * * *` in `vercel.json` breaks the whole deployment. It needs a Pro plan
+(minimum interval: once per minute). Note also that Hobby cron timing is only
+accurate to ±59 minutes.
+
+To get true hourly syncing while staying on Hobby, leave `vercel.json` daily and
+drive it externally instead — GitHub Actions, cron-job.org, or any uptime monitor
+hitting `/api/cron/sync` with `Authorization: Bearer $CRON_SECRET`.
+
+The in-process scheduler starts automatically with the API server (`src/index.ts`);
+`config/cron.json` is watched, so editing the schedule needs neither rebuild nor
+restart. A tick that lands while the previous run is still paging is **skipped**,
+not stacked.
 
 `GET /api/cron/status` reports where every cursor sits — the fastest way to answer
 "is the sync alive?".
