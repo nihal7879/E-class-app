@@ -69,6 +69,8 @@ export function readExcel(filePath: string): IngestBatch {
       if (!userId) continue;
       logins.push({
         userId,
+        // Excel rows carry no upstream `ID` — they never participate in dedupe.
+        upstreamId: null,
         loginDate:   parseDate(r["LoginDate"]),
         loginTime:   normalizeTime(r["LoginTime"]),
         logoutDate:  parseDate(r["LogoutDate"]),
@@ -89,6 +91,7 @@ export function readExcel(filePath: string): IngestBatch {
       if (!userId) continue;
       videos.push({
         userId,
+        upstreamId: null,
         course:            nullIfEmpty(r["Course"]),
         subject:           nullIfEmpty(r["Subject"]),
         chapter:           nullIfEmpty(r["Chapter"]),
@@ -113,6 +116,7 @@ export function readExcel(filePath: string): IngestBatch {
       if (!userId) continue;
       mcq.push({
         userId,
+        upstreamId: null,
         course:             nullIfEmpty(r["Course"]),
         subject:            nullIfEmpty(r["Subject"]),
         chapter:            nullIfEmpty(r["Chapter"]),

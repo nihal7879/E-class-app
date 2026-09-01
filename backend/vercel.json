@@ -1,12 +1,20 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/api" }
+    {
+      "source": "/(.*)",
+      "destination": "/api"
+    }
   ],
   "functions": {
-    "api/index.ts": { "maxDuration": 60 }
+    "api/index.ts": {
+      "maxDuration": 60
+    }
   },
   "crons": [
-    { "path": "/api/cron/daily-ingest", "schedule": "30 2 * * *" }
+    {
+      "path": "/api/cron/daily-ingest",
+      "schedule": "0 * * * *"
+    }
   ]
 }

@@ -38,6 +38,13 @@ export interface RawMedium {
 
 export interface RawLogin {
   userId: number;
+  /**
+   * The API's own row id (`ID`): a number for Login, a GUID for VideoUsage and
+   * MCQ. Stored as the dedupe key — consecutive sync pages overlap, so without
+   * it every run would duplicate rows. Null for Excel-sourced rows.
+   */
+  upstreamId: string | null;
+
   loginDate: string | null;        // YYYY-MM-DD
   loginTime: string | null;        // wall-clock 'H:MM:SS'
   logoutDate: string | null;
@@ -47,6 +54,8 @@ export interface RawLogin {
 
 export interface RawVideo {
   userId: number;
+  /** Upstream `ID` (GUID). See RawLogin.upstreamId. */
+  upstreamId: string | null;
   course: string | null;
   subject: string | null;
   chapter: string | null;
@@ -60,6 +69,8 @@ export interface RawVideo {
 
 export interface RawMcq {
   userId: number;
+  /** Upstream `ID` (GUID). See RawLogin.upstreamId. */
+  upstreamId: string | null;
   course: string | null;
   subject: string | null;
   /** Repaired chapter name — see ingest/chapterRepair.ts. */

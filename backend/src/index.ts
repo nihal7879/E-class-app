@@ -15,7 +15,7 @@ import studentsRouter from "./routes/students.js";
 import reportRouter from "./routes/report.js";
 import authRouter from "./routes/auth.js";
 import cronRouter from "./routes/cron.js";
-import { scheduleDailyIngest } from "./jobs/dailyIngest.js";
+import { scheduleApiSync } from "./jobs/apiSync.js";
 
 const app = express();
 
@@ -56,15 +56,15 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 // On a persistent host (local dev, VPS, Render, …) we run a real HTTP server and
-// the in-process daily cron. On Vercel (serverless) there is no long-lived
+// the in-process hourly cron. On Vercel (serverless) there is no long-lived
 // process: `process.env.VERCEL` is set, so we skip listen()/node-cron and instead
-// export the app for api/index.ts to serve as a function — the daily job is then
+// export the app for api/index.ts to serve as a function — the sync is then
 // driven by Vercel Cron hitting /api/cron/daily-ingest (see vercel.json).
 if (!process.env.VERCEL) {
   app.listen(env.PORT, () => {
     console.log(`API listening on http://localhost:${env.PORT}`);
     console.log(`Health check: http://localhost:${env.PORT}/api/health`);
-    scheduleDailyIngest();
+    scheduleApiSync();
   });
 }
 

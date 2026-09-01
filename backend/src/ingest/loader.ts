@@ -12,7 +12,7 @@ import {
   type RepairStats,
 } from "./chapterRepair.js";
 
-export type IngestMode = "replace" | "append" | "daily";
+export type IngestMode = "replace" | "append" | "daily" | "sync";
 
 export interface LoadOptions {
   mode: IngestMode;
@@ -49,10 +49,23 @@ export interface LoadResult {
  *                        re-bootstrapping the DB from a single full export.
  *                        (institutes / mediums are a slowly-accumulating dimension
  *                        and are NOT truncated — only upserted.)
- *  - 'daily':            idempotent single-day load (the cron's mode). DELETE the
- *                        given date's rows from login_history / video_usage /
- *                        mcq_report, then INSERT — so re-running the same day never
- *                        duplicates. Users / institutes / mediums are upserted.
+ *  - 'daily':            idempotent single-day load. DELETE the given date's rows
+ *                        from login_history / video_usage / mcq_report, then
+ *                        INSERT — so re-running the same day never duplicates.
+ *                        Users / institutes / mediums are upserted.
+ *  - 'sync':             the hourly cursor sync's mode. Deletes NOTHING. Every
+ *                        fact row upserts on `upstream_id`, so re-fetching the
+ *                        same rows is a no-op. This is the only mode that is
+ *                        correct for the paged API, because one page carries rows
+ *                        for MANY different dates (the window filters on an
+ *                        upstream sync timestamp, not on the row's own date) — a
+ *                        date-scoped DELETE would wipe days it never replaces.
+ *
+ * Fact-row inserts are ON DUPLICATE KEY UPDATE on `upstream_id` in EVERY mode,
+ * not just 'sync': consecutive API pages overlap by design (measured: 7 repeated
+ * rows between Login pages 1 and 2), so a plain INSERT duplicates them. Rows with
+ * no upstream id — anything loaded from Excel — have upstream_id NULL, and MySQL
+ * allows any number of NULLs in a UNIQUE index, so they behave exactly as before.
  */
 export async function loadBatch(
   batch: IngestBatch,
@@ -70,6 +83,9 @@ export async function loadBatch(
       await conn.query("TRUNCATE TABLE mcq_report");
       await conn.query("TRUNCATE TABLE users");
       await conn.query("SET FOREIGN_KEY_CHECKS = 1");
+    } else if (mode === "sync") {
+      // Nothing to clear: the cursor sync is made idempotent by the upstream_id
+      // upsert below, not by deleting a window first.
     } else if (mode === "daily") {
       if (!opts.date) throw new Error("daily mode requires opts.date (YYYY-MM-DD)");
       // Re-loading a day: delete that day's rows then re-insert. AUTO_INCREMENT
@@ -201,11 +217,19 @@ async function upsertUsers(conn: PoolConnection, batch: IngestBatch): Promise<vo
 async function insertLogins(conn: PoolConnection, batch: IngestBatch): Promise<void> {
   const sql =
     `INSERT INTO login_history
-       (user_id, login_date, login_time, logout_date, logout_time, session_time)
-     VALUES ?`;
+       (user_id, upstream_id, login_date, login_time, logout_date, logout_time, session_time)
+     VALUES ?
+     ON DUPLICATE KEY UPDATE
+       user_id      = VALUES(user_id),
+       login_date   = VALUES(login_date),
+       login_time   = VALUES(login_time),
+       logout_date  = VALUES(logout_date),
+       logout_time  = VALUES(logout_time),
+       session_time = VALUES(session_time)`;
   for (const chunk of chunked(batch.logins, 1000)) {
     const values = chunk.map((r) => [
-      r.userId, r.loginDate, r.loginTime, r.logoutDate, r.logoutTime, r.sessionTime,
+      r.userId, r.upstreamId ?? null,
+      r.loginDate, r.loginTime, r.logoutDate, r.logoutTime, r.sessionTime,
     ]);
     await conn.query(sql, [values]);
   }
@@ -214,12 +238,24 @@ async function insertLogins(conn: PoolConnection, batch: IngestBatch): Promise<v
 async function insertVideos(conn: PoolConnection, batch: IngestBatch): Promise<void> {
   const sql =
     `INSERT INTO video_usage
-       (user_id, course, subject, chapter, content_name, content_type,
+       (user_id, upstream_id, course, subject, chapter, content_name, content_type,
         total_view_duration, total_view_count, last_access_date, last_access_time)
-     VALUES ?`;
+     VALUES ?
+     ON DUPLICATE KEY UPDATE
+       user_id             = VALUES(user_id),
+       course              = VALUES(course),
+       subject             = VALUES(subject),
+       chapter             = VALUES(chapter),
+       content_name        = VALUES(content_name),
+       content_type        = VALUES(content_type),
+       total_view_duration = VALUES(total_view_duration),
+       total_view_count    = VALUES(total_view_count),
+       last_access_date    = VALUES(last_access_date),
+       last_access_time    = VALUES(last_access_time)`;
   for (const chunk of chunked(batch.videos, 1000)) {
     const values = chunk.map((r) => [
-      r.userId, r.course, r.subject, r.chapter, r.contentName, r.contentType,
+      r.userId, r.upstreamId ?? null,
+      r.course, r.subject, r.chapter, r.contentName, r.contentType,
       r.totalViewDuration, r.totalViewCount, r.lastAccessDate, r.lastAccessTime,
     ]);
     await conn.query(sql, [values]);
@@ -229,13 +265,28 @@ async function insertVideos(conn: PoolConnection, batch: IngestBatch): Promise<v
 async function insertMcq(conn: PoolConnection, batch: IngestBatch): Promise<void> {
   const sql =
     `INSERT INTO mcq_report
-       (user_id, course, subject, chapter, chapter_raw,
+       (user_id, upstream_id, course, subject, chapter, chapter_raw,
         total_question, right_question_count, total_marks, marks_obtained, percentage,
         attempted_date, attempted_time, time_spent)
-     VALUES ?`;
+     VALUES ?
+     ON DUPLICATE KEY UPDATE
+       user_id              = VALUES(user_id),
+       course               = VALUES(course),
+       subject              = VALUES(subject),
+       chapter              = VALUES(chapter),
+       chapter_raw          = VALUES(chapter_raw),
+       total_question       = VALUES(total_question),
+       right_question_count = VALUES(right_question_count),
+       total_marks          = VALUES(total_marks),
+       marks_obtained       = VALUES(marks_obtained),
+       percentage           = VALUES(percentage),
+       attempted_date       = VALUES(attempted_date),
+       attempted_time       = VALUES(attempted_time),
+       time_spent           = VALUES(time_spent)`;
   for (const chunk of chunked(batch.mcq, 1000)) {
     const values = chunk.map((r) => [
-      r.userId, r.course, r.subject, r.chapter, r.chapterRaw ?? r.chapter,
+      r.userId, r.upstreamId ?? null,
+      r.course, r.subject, r.chapter, r.chapterRaw ?? r.chapter,
       r.totalQuestion, r.rightQuestionCount, r.totalMarks, r.marksObtained, r.percentage,
       r.attemptedDate, r.attemptedTime, r.timeSpent,
     ]);

@@ -23,6 +23,8 @@ All endpoints return JSON. All filter-aware endpoints accept the same query-para
 | 11 | `GET /api/videos/usage` | `VideoUsageCard` |
 | 12 | `GET /api/mcq/results` | `McqResultsCard` |
 | 13 | `GET /api/students` | `StudentList`, `StudentBreakdownChart` |
+| 14 | `GET /api/cron/status` | (monitoring — where the ingest cursors sit) |
+| 15 | `GET /api/cron/daily-ingest` | (Vercel Cron trigger; alias `/api/cron/sync`) |
 
 ---
 
@@ -440,6 +442,59 @@ Per-student aggregated stats. Feeds `StudentList` and `StudentBreakdownChart`.
 
 ---
 
+## 14. `GET /api/cron/status`
+
+Where each report's ingest cursor currently sits. Unauthenticated on purpose — it
+exposes no student data, only timestamps and counts, and it is the fastest way to
+answer "is the hourly sync alive?".
+
+**Response**
+```jsonc
+{
+  "now": "2026-09-01T11:30:04.512Z",
+  "reports": [
+    {
+      "report": "logins",
+      "nextStartDate": "2026-09-01 11:06:38",   // where the next run resumes
+      "lastSyncAt":    "2026-09-01 11:00:12",
+      "lastStatus":    "ok",                     // or "error: <message>"
+      "rowsLastSync":  776,
+      "pagesLastSync": 1
+    }
+    // … videos, mcq
+  ]
+}
+```
+
+A `nextStartDate` that stops moving, or a `lastStatus` beginning `error:`, means the
+sync is stuck — see `docs/INGEST.md` → Troubleshooting.
+
+---
+
+## 15. `GET /api/cron/daily-ingest`
+
+Runs one incremental API sync and reports the outcome. Alias: `GET /api/cron/sync`.
+The original path name is kept so the existing Vercel Cron entry and any external
+monitor keep working.
+
+Guarded by a shared secret — the request must carry
+`Authorization: Bearer <CRON_SECRET>`. On a persistent host you don't need this at
+all: `src/index.ts` starts an in-process hourly scheduler. It exists for Vercel,
+where there is no long-lived process to hold a cron.
+
+| HTTP | When |
+|---|---|
+| 200 | every report synced cleanly — body carries a per-report result array |
+| 401 | missing/wrong `Authorization` header |
+| 500 | **any** report failed — a partial run is a failure here, not a green 200 |
+| 503 | `CRON_SECRET` is not configured on the server |
+
+The 500-on-partial is deliberate. A swallowed error used to make every Vercel cron run
+report HTTP 200 "success" while ingesting nothing, which is exactly how a broken cron
+went unnoticed for weeks.
+
+---
+
 ## Error responses
 
 | HTTP | Shape | When |
@@ -473,6 +528,34 @@ Per-student aggregated stats. Feeds `StudentList` and `StudentBreakdownChart`.
 | Aggregated duration (`SUM`, `AVG`) | computed at query time via `TIME_TO_SEC(col) * 1000` | number, milliseconds (e.g. `totalSessionMs`, `videoWatchMs`) |
 
 The DB stays human-readable. The API hands the frontend a numeric duration for charts and arithmetic.
+
+### Time zone
+
+**Every DB connection runs in IST (`+05:30`)** — set on each pooled connection in
+`src/db.ts`, overridable via `DB_TIMEZONE`.
+
+This is not cosmetic. The database host's own clock is on **Pacific time**, so
+without it `NOW()`, `CURRENT_TIMESTAMP` and every `created_on` / `updated_on`
+value read back 12h30m behind Indian wall-clock time — a row written at 11:33 IST
+displayed as `2026-08-31 23:03`.
+
+| Column type | Zone-sensitive? | Notes |
+|---|---|---|
+| `DATETIME` (`created_on`, `updated_on`, `sync_state.*`) | no — literal wall clock | Read identically by every client. `created_on`/`updated_on` were `TIMESTAMP` until migration `004`; see below. |
+| `DATE` / `TIME` (`login_date`, `session_time`, …) | no | Values come from the API as literal strings and are never converted. |
+
+**Why the audit columns are `DATETIME` and not `TIMESTAMP`.** A `TIMESTAMP`
+renders in the *reading* session's zone, so on this Pacific-clocked server the
+same row showed `2026-09-01 11:33` through the app (pool pinned to +05:30) and
+`2026-08-31 23:03` in MySQL Workbench — a day earlier. The server can't be
+corrected (`SET GLOBAL time_zone` is denied; no SUPER on shared hosting).
+`DATETIME` stores literal text nothing converts, so every client agrees.
+Applied by `npm run db:audit-ist`; reversible with `-- --revert`.
+
+Use the numeric offset, never `'Asia/Kolkata'` — this server rejects named zones
+(`Unknown or incorrect time zone`) because the `mysql.time_zone` tables aren't
+populated, which is normal on shared hosting. India has never observed DST, so
+`+05:30` is exact year-round.
 
 ---
 

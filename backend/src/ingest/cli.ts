@@ -1,7 +1,14 @@
 /**
- * Ingest CLI — drives both flows:
+ * Ingest CLI — drives both flows.
  *
- *   Flow 1 (primary, live API):
+ * NOTE: for the live API, prefer `npm run sync` (src/scripts/sync.ts). This CLI's
+ * API path predates the cursor feed: it asks for a date window and assumes the
+ * response is that window's rows. It isn't — the window filters on an upstream
+ * sync timestamp, so a single call returns rows spanning years, and `--mode=daily`
+ * then DELETEs one date while inserting all of them. Kept for Excel ingest and for
+ * one-off manual re-fetches; see docs/INGEST.md → Flow 1.
+ *
+ *   Flow 1 (legacy, live API):
  *     npm run ingest:api                       # ingests YESTERDAY (daily mode)
  *     npm run ingest:api -- --date=2026-06-15  # backfill a specific day
  *     npm run ingest:api -- --from=2026-01-01 --to=2026-06-20   # backfill a range
