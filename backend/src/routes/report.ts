@@ -116,6 +116,16 @@ router.get(
     );
 
     // Video Usage.
+    //
+    // Rows with a `00:00:00` view duration are left out, so the download matches
+    // what the dashboard shows. Upstream records an entry the moment a student
+    // opens a piece of content, even if nothing ever played; those rows carry a
+    // real content name and `Total View Count = 1` but no watch time, so in a
+    // sheet they read as "this student watched this topic" when they did not.
+    // The dashboard already drops them (SchoolDetailPage's top/low student lists
+    // and per-student chart); this keeps the export consistent with it.
+    // Currently 8,410 of 192,830 video_usage rows — 187 of the 7,186 in a recent
+    // client download.
     const video = buildWhereClause(filter, {
       dateColumn: "vu.last_access_date",
       instituteColumn: "u.institute_id",
@@ -147,7 +157,7 @@ router.get(
        FROM video_usage vu
        JOIN users u ON u.user_id = vu.user_id
        LEFT JOIN mediums med ON med.medium_id = u.medium_id
-       ${video.where}
+       ${video.where ? video.where + " AND " : " WHERE "}TIME_TO_SEC(vu.total_view_duration) > 0
        ORDER BY vu.last_access_date DESC, vu.last_access_time DESC`,
       video.params,
     );
